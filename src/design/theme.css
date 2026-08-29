@@ -1,0 +1,76 @@
+/*
+ * Palette, light and dark.
+ *
+ * Three states, and all three must be handled: an explicit choice stamps
+ * `data-theme` on the root, while the default "system" setting stamps nothing
+ * and leaves `prefers-color-scheme` to decide. Every variable is defined on
+ * bare `:root` first so no colour has its only definition inside a media
+ * query — that is how a page ends up with no background at all in one state.
+ *
+ * The ground is warm off-white rather than #fff, and dark is warm charcoal
+ * rather than #000. This is an app for reading words set in a serif, and type
+ * on a warm ground reads like a page instead of a screen.
+ *
+ * Dark is not a straight inversion. Accent and gold both lift in dark, because
+ * a colour that reads as considered against paper reads as muddy against
+ * charcoal at the same lightness.
+ */
+
+:root {
+  --ws-ink: #16130f;
+  --ws-ink-soft: #4a443c;
+  --ws-ink-faint: #8b8279;
+  --ws-paper: #faf7f2;
+  --ws-paper-raised: #fffefb;
+  --ws-paper-sunken: #f2ede4;
+  --ws-line: #e5ded2;
+  --ws-line-strong: #cfc5b5;
+  --ws-accent: #2f4858;
+  --ws-accent-soft: #e3ebf0;
+  --ws-gold: #b07d2b;
+  --ws-gold-soft: #f6ecd9;
+  --ws-success: #4a6b4f;
+  --ws-success-soft: #e6efe7;
+  --ws-danger: #8c3a30;
+  --ws-shadow: rgba(22, 19, 15, 0.10);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ws-ink: #f3efe7;
+    --ws-ink-soft: #bcb4a8;
+    --ws-ink-faint: #877f76;
+    --ws-paper: #161513;
+    --ws-paper-raised: #1f1d1a;
+    --ws-paper-sunken: #100f0e;
+    --ws-line: #302d29;
+    --ws-line-strong: #45413a;
+    --ws-accent: #7fa8c0;
+    --ws-accent-soft: #22313a;
+    --ws-gold: #d9a54e;
+    --ws-gold-soft: #33291a;
+    --ws-success: #85ad8b;
+    --ws-success-soft: #1f2a21;
+    --ws-danger: #cf7a6c;
+    --ws-shadow: rgba(0, 0, 0, 0.45);
+  }
+}
+
+:root[data-theme='dark'] {
+  --ws-ink: #f3efe7;
+  --ws-ink-soft: #bcb4a8;
+  --ws-ink-faint: #877f76;
+  --ws-paper: #161513;
+  --ws-paper-raised: #1f1d1a;
+  --ws-paper-sunken: #100f0e;
+  --ws-line: #302d29;
+  --ws-line-strong: #45413a;
+  --ws-accent: #7fa8c0;
+  --ws-accent-soft: #22313a;
+  --ws-gold: #d9a54e;
+  --ws-gold-soft: #33291a;
+  --ws-success: #85ad8b;
+  --ws-success-soft: #1f2a21;
+  --ws-danger: #cf7a6c;
+  --ws-shadow: rgba(0, 0, 0, 0.45);
+}

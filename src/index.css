@@ -1,0 +1,108 @@
+/*
+ * Global reset and base type.
+ *
+ * Fonts are self-hosted via @fontsource rather than linked from Google Fonts:
+ * an installed PWA opened offline must not be waiting on a network font, and a
+ * face that fails to load silently falls back to a system default that undoes
+ * the entire design.
+ *
+ * Four families, because the reading face is a setting — see
+ * `design/typefaces.ts`. Only the weights each family actually ships are
+ * imported. Atkinson Hyperlegible and OpenDyslexic publish 400 and 700 only;
+ * asking either for 500 or 600 gets a browser-synthesised weight, which is
+ * exactly the wrong outcome in the two faces chosen for legibility.
+ *
+ * All four load up front rather than on demand. Together they are a few hundred
+ * KB, they are cached by the service worker after first visit, and swapping a
+ * face is a setting someone changes while looking at the screen — a lazy load
+ * there means watching the page reflow, which is precisely what an
+ * accessibility setting must not do.
+ */
+
+@import '@fontsource/fraunces/400.css';
+@import '@fontsource/fraunces/500.css';
+@import '@fontsource/fraunces/600.css';
+@import '@fontsource/archivo/400.css';
+@import '@fontsource/archivo/500.css';
+@import '@fontsource/archivo/600.css';
+@import '@fontsource/atkinson-hyperlegible/400.css';
+@import '@fontsource/atkinson-hyperlegible/700.css';
+@import '@fontsource/opendyslexic/400.css';
+@import '@fontsource/opendyslexic/700.css';
+
+@import './design/theme.css';
+
+/*
+ * Face defaults.
+ *
+ * `useTypefaces` overwrites these on the root element as soon as React mounts.
+ * They exist so the first painted frame is already in the right shape — without
+ * them the page renders once in a system font and reflows, which is worst for
+ * exactly the readers the face setting is for.
+ *
+ * These must match `DEFAULT_WORD_FACE` and `DEFAULT_BODY_FACE` in
+ * `design/typefaces.ts`.
+ */
+:root {
+  --ws-font-word: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --ws-scale-word: 1;
+  --ws-leading-word: 1;
+  --ws-weight-word-medium: 500;
+  --ws-weight-word-bold: 600;
+
+  --ws-font-body: 'Archivo', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ws-scale-body: 0.97;
+  --ws-leading-body: 1;
+  --ws-weight-body-medium: 500;
+  --ws-weight-body-bold: 600;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/*
+ * Base size is multiplied by the body face's own optical scale, so every
+ * `em`-based size downstream inherits the correction. A face that runs large
+ * pulls the whole app back by the same proportion rather than needing each
+ * component to know about it.
+ */
+body {
+  margin: 0;
+  font-family: var(--ws-font-body);
+  font-size: calc(15px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  background: var(--ws-paper);
+  color: var(--ws-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /*
+   * Stops iOS Safari enlarging text when the phone turns to landscape, which
+   * otherwise rescales a layout measured in portrait.
+   */
+  -webkit-text-size-adjust: 100%;
+}
+
+/*
+ * Honour a system-level request for less motion. Not a nicety — vestibular
+ * disorders make large transitions genuinely unpleasant, and every animation in
+ * this app is decoration rather than information.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

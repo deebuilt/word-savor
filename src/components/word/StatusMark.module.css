@@ -1,0 +1,59 @@
+/*
+ * The status mark.
+ *
+ * A dot, not a chip. Every row in the library carries one, and a row of
+ * coloured pills down the right edge would compete with the words themselves —
+ * which are the thing worth looking at. A dot reads as a state at a glance and
+ * disappears when you are not looking for it.
+ */
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  /* A ring rather than a fill for the early states — the progression reads as
+     filling in as a word gets closer to being owned. */
+  border: 1.5px solid var(--ws-line-strong);
+  background: transparent;
+}
+
+/* spotted: an empty ring. Saved, nothing more. */
+.spotted {
+  border-color: var(--ws-line-strong);
+}
+
+/* understood: the definition has landed. */
+.understood {
+  border-color: var(--ws-ink-faint);
+}
+
+/* rehearsed: practised, but only inside the app. */
+.rehearsed {
+  border-color: var(--ws-accent);
+}
+
+/* used: said or written it in the wild. The first state that means anything. */
+.used {
+  border-color: var(--ws-gold);
+  background: var(--ws-gold);
+}
+
+/* owned: used more than once, unprompted. */
+.owned {
+  border-color: var(--ws-success);
+  background: var(--ws-success);
+}
+
+.label {
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  color: var(--ws-ink-faint);
+  text-transform: lowercase;
+}

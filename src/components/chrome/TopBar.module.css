@@ -1,0 +1,94 @@
+/*
+ * The header: wordmark left, controls right.
+ *
+ * Neither sticky nor fixed — it is a sibling of the scrolling region rather
+ * than inside it, so it stays put on its own. The shell is a column of three:
+ * this bar, one scroll area, and the nav. Nothing here needs to be lifted out
+ * of flow, which also means no `z-index` and no height for other components to
+ * compensate for.
+ */
+.bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 16px;
+  /* Clear of a notch when the app is installed and running full-bleed. */
+  padding-top: max(8px, env(safe-area-inset-top));
+  border-bottom: 1px solid var(--ws-line);
+  /*
+   * Opaque, not translucent. A blurred bar over scrolling serif text is the
+   * glassmorphism look this design avoids, and it costs a compositor layer on
+   * exactly the low-end phones this app should stay fast on.
+   */
+  background: var(--ws-paper);
+}
+
+/*
+ * The wordmark.
+ *
+ * Set in the word face, because it is the app saying its own name in the voice
+ * it sets every word in. It is the one place the two words are locked up as a
+ * single unit, so the weight shift carries the join instead of a space.
+ */
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  margin: 0;
+  font-family: var(--ws-font-word);
+  font-size: calc(21px * var(--ws-scale-word));
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--ws-ink);
+  user-select: none;
+}
+
+.markWord {
+  font-weight: var(--ws-weight-word-bold);
+}
+
+/* "Savor" in the lighter weight — the join reads without a space or a dot. */
+.markSavor {
+  font-weight: var(--ws-weight-word-medium);
+  color: var(--ws-ink-soft);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/*
+ * An icon button sized for a thumb, not a cursor. 44px is the floor below which
+ * a target starts getting missed on a phone.
+ */
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  font-size: 17px;
+  color: var(--ws-ink-soft);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.action:hover {
+  color: var(--ws-ink);
+  background: var(--ws-paper-sunken);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: -2px;
+}

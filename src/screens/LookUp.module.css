@@ -1,0 +1,191 @@
+/*
+ * Look Up.
+ *
+ * The search field stays put and results appear beneath it. A result that
+ * navigates to its own screen would mean going back to fix a typo, and typos
+ * are the common case for a word you have just heard and never seen written.
+ */
+
+.screen {
+  padding: 20px 16px 32px;
+  /* The reading column. Beyond this the definitions get too wide to scan, and
+     the layout starts looking like a desktop app squeezed onto a phone. */
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.search {
+  display: flex;
+  gap: 8px;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Result ------------------------------------------------------------------- */
+
+.result {
+  margin-top: 28px;
+}
+
+/*
+ * The word and its Save button share the top of the result.
+ *
+ * Save sits here rather than after the definitions on purpose: a word like
+ * "bank" carries twelve senses, and a save button below them is a scroll
+ * through a wall of text to reach the only action on the screen. The decision
+ * to keep a word is made when you see it, not after reading every sense.
+ */
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.headText {
+  /* `min-width: 0` so a long word wraps instead of pushing Save off the row. */
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+/* Pronunciation and rarity, on one line under the word. */
+.meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+}
+
+.pronunciation {
+  font-family: var(--ws-font-body);
+  font-size: calc(15px * var(--ws-scale-body));
+  color: var(--ws-ink-soft);
+}
+
+.audioButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--ws-line);
+  border-radius: 4px;
+  background: none;
+  color: var(--ws-ink-soft);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.audioButton:hover {
+  color: var(--ws-ink);
+  border-color: var(--ws-line-strong);
+}
+
+.audioButton:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+}
+
+.senses {
+  margin-top: 24px;
+}
+
+/* Sections below the definitions, each behind a rule. */
+.section {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ws-line);
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}
+
+.terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Encounter --------------------------------------------------------------- */
+
+/*
+ * The encounter fields sit under the definitions rather than beside Save.
+ *
+ * Visible, never required. Someone adding a word they simply liked the look of
+ * should be able to save and leave; someone who met it in a novel gets the
+ * fields waiting without having been stopped by them.
+ */
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  color: var(--ws-ink-soft);
+}
+
+.hint {
+  font-size: calc(13px * var(--ws-scale-body));
+  color: var(--ws-ink-faint);
+}
+
+/* States ------------------------------------------------------------------ */
+
+.state {
+  margin-top: 32px;
+  text-align: center;
+  color: var(--ws-ink-soft);
+}
+
+.stateTitle {
+  margin: 0 0 6px;
+  font-family: var(--ws-font-word);
+  font-size: calc(21px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-medium);
+  color: var(--ws-ink);
+}
+
+.stateBody {
+  margin: 0 auto;
+  max-width: 34ch;
+  font-size: calc(15px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+}
+
+/*
+ * The empty state, before anything has been searched.
+ *
+ * Quiet on purpose. This screen opens with a cursor in a field, and a large
+ * illustration or a row of suggested words would both work against the premise:
+ * the app does not hand you words, you bring them.
+ */
+.empty {
+  margin-top: 48px;
+  text-align: center;
+  color: var(--ws-ink-faint);
+  font-size: calc(15px * var(--ws-scale-body));
+  line-height: calc(1.6 * var(--ws-leading-body));
+}

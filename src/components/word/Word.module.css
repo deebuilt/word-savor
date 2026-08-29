@@ -1,0 +1,68 @@
+/*
+ * The word itself, wherever it appears.
+ *
+ * Every size here is the token value multiplied by `--ws-scale-word`, and every
+ * line-height by `--ws-leading-word`. That is what makes the reading-face
+ * setting real: a reader on OpenDyslexic gets the face pulled back to 0.9 and
+ * its leading opened to 1.12 at every size at once, rather than each component
+ * having to know which face is active.
+ *
+ * Weight is `--ws-weight-word-bold`, never a literal. Fraunces ships a 600;
+ * Atkinson Hyperlegible and OpenDyslexic jump 400 to 700 with nothing between,
+ * so a hardcoded 600 would be browser-synthesised on exactly the two faces
+ * chosen for legibility.
+ */
+
+.word {
+  display: block;
+  font-family: var(--ws-font-word);
+  font-weight: var(--ws-weight-word-bold);
+  line-height: calc(1.15 * var(--ws-leading-word));
+  color: var(--ws-ink);
+  /* A long word must break rather than widen its container past the viewport —
+     "incomprehensibilities" at display size is wider than a 375px screen. */
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Four sizes, matching the type scale in `tokens.ts`.
+ *
+ * `display` is the word alone on the detail screen, large enough to be the
+ * subject of the page. `title` heads a result. `row` is the library list.
+ * `inline` sits inside running text — a related word, a synonym chip.
+ */
+.display {
+  font-size: calc(52px * var(--ws-scale-word));
+  letter-spacing: -0.025em;
+}
+
+.title {
+  font-size: calc(38px * var(--ws-scale-word));
+  letter-spacing: -0.02em;
+}
+
+.row {
+  font-size: calc(21px * var(--ws-scale-word));
+  letter-spacing: -0.01em;
+}
+
+.inline {
+  display: inline;
+  font-size: calc(17px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-medium);
+}
+
+/*
+ * The display size is set for a phone first. Below 380px a long word at 52px
+ * still crowds the edges even with `overflow-wrap`, so it steps down — the word
+ * should command the screen, not fight it.
+ */
+@media (max-width: 380px) {
+  .display {
+    font-size: calc(42px * var(--ws-scale-word));
+  }
+
+  .title {
+    font-size: calc(32px * var(--ws-scale-word));
+  }
+}

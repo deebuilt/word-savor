@@ -1,0 +1,127 @@
+/*
+ * Five equal columns rather than a flex row with gaps. Equal division is what
+ * makes the bar read as a nav: items are the same width whether their labels
+ * are four characters or eight, so the row is a rhythm rather than five
+ * differently-sized blocks. It also means Look Up is optically centred by the
+ * geometry itself, with no side-group balancing to keep in sync.
+ */
+.bar {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: stretch;
+  padding: 6px 4px;
+  /* Clear of the iOS home indicator. */
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--ws-line);
+  background: var(--ws-paper-raised);
+}
+
+/*
+ * `min-width: 0` because a grid item defaults to `min-width: auto` and refuses
+ * to shrink below the intrinsic width of its contents. Without it a long label
+ * widens its own track past the `1fr` it was given and the five columns stop
+ * being equal.
+ */
+.item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  /* Comfortably past the 44px minimum target once the label is counted. */
+  min-height: 52px;
+  padding: 4px 2px;
+  border: none;
+  background: none;
+  color: var(--ws-ink-faint);
+  cursor: pointer;
+  /* A tap on a nav item should not also select its label. */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 120ms ease;
+}
+
+.item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* `position: relative` so the due badge can anchor to the glyph rather than to
+   the whole item — pinned to the button it would drift as the label changes. */
+.icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 21px;
+  line-height: 1;
+}
+
+/*
+ * 11px — below the 12px floor of the type scale, deliberately. A nav label is
+ * not read, it is recognised; at body size five of them across a phone compete
+ * with the words themselves, which are the thing worth looking at.
+ *
+ * The letter-spacing keeps it legible at that size, and the nowrap is
+ * insurance: every label fits its column today, and one added later that does
+ * not should visibly overflow rather than quietly become two lines and make the
+ * bar taller than its neighbours.
+ */
+.label {
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* The open tab, marked. Weight as well as colour, so it does not rely on colour
+   alone to say where you are. */
+.active {
+  color: var(--ws-ink);
+}
+
+.active .label {
+  font-weight: var(--ws-weight-body-medium);
+}
+
+/*
+ * Look Up leads by colour alone — no raised circle. A circle with a caption
+ * underneath does not read as a nav item; it reads as a circle that happens to
+ * have text below it, and the four labels beside it look like its own has
+ * fallen off. The accent glyph does the same job in a row of quiet marks
+ * without breaking the shape that makes the other four read as navigation.
+ */
+.lookUpItem {
+  color: var(--ws-accent);
+}
+
+.lookUpItem .label {
+  font-weight: var(--ws-weight-body-medium);
+}
+
+/*
+ * The due count.
+ *
+ * Gold rather than red: a queue of words waiting is an invitation, not an
+ * error, and red would make the app feel like it is nagging — which is the
+ * failure mode of every vocabulary app that feeds you words.
+ *
+ * Sized in ch so a three-character "99+" stays a rounded rectangle instead of
+ * being clipped by a fixed width.
+ */
+.badge {
+  position: absolute;
+  top: -4px;
+  left: 12px;
+  min-width: 1.4ch;
+  padding: 1px 4px;
+  border-radius: 999px;
+  background: var(--ws-gold);
+  color: #fff;
+  font-size: 10px;
+  font-weight: var(--ws-weight-body-bold);
+  line-height: 1.4;
+  text-align: center;
+}

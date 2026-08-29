@@ -1,0 +1,87 @@
+/*
+ * The shell: one scrolling region above a nav that never moves.
+ *
+ * `100dvh` rather than `100vh` — on mobile, `vh` is measured against the
+ * viewport with the URL bar expanded, so a `100vh` shell puts its last 60px
+ * underneath the browser chrome and the bottom bar sits off-screen until you
+ * scroll. `dvh` tracks the bar collapsing, which is the whole reason this app
+ * can pin a nav at the bottom at all.
+ */
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--ws-paper);
+  color: var(--ws-ink);
+}
+
+/*
+ * `min-height: 0` on a flex child that scrolls. A flex item defaults to
+ * `min-height: auto` and refuses to shrink below its content, so without this
+ * the main region grows to fit whatever is inside it and pushes the nav off
+ * the bottom instead of scrolling.
+ *
+ * `overscroll-behavior: contain` stops a scroll that reaches the end of the
+ * list from chaining to the page and triggering pull-to-refresh — which, in an
+ * app whose state is entirely local, means an accidental full reload.
+ */
+.main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.screen {
+  padding: 32px 20px 24px;
+}
+
+/*
+ * Screen titles are set in the word face, not the body face.
+ *
+ * The word face is the app's voice and the reason the library reads as a
+ * collection rather than a list of records. Using it for headings as well as
+ * for the words themselves is what ties the two together — and it means a
+ * reader who switches to Hyperlegible gets it here too, not just on the words.
+ *
+ * Every value comes from a variable rather than a literal: the family, the
+ * optical scale, and the weight. Fraunces has a 600; Atkinson Hyperlegible and
+ * OpenDyslexic stop at 700 with nothing between 400 and it, so a hardcoded 600
+ * would be synthesised on two of the four faces.
+ */
+.title {
+  margin: 0 0 8px;
+  font-family: var(--ws-font-word);
+  font-size: calc(38px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-bold);
+  line-height: calc(1.1 * var(--ws-leading-word));
+  letter-spacing: -0.02em;
+  color: var(--ws-ink);
+}
+
+.body {
+  margin: 0;
+  max-width: 34ch;
+  font-size: calc(15px * var(--ws-scale-body));
+  line-height: calc(1.55 * var(--ws-leading-body));
+  color: var(--ws-ink-soft);
+}
+
+/* Settings groups on the More screen. The rule sits above each one rather than
+   below, so the last group does not end on a line with nothing under it. */
+.section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--ws-line);
+  max-width: 460px;
+}
+
+.sectionTitle {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}

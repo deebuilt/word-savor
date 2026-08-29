@@ -1,0 +1,113 @@
+/*
+ * Definitions.
+ *
+ * Body face throughout — the word face is reserved for the word. Sizes are
+ * multiplied by `--ws-scale-body` and leading by `--ws-leading-body`, so a
+ * reader on Hyperlegible gets its extra leading here as well as on the word.
+ */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sense {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/*
+ * The part of speech. Small, uppercase, and set in the body face regardless of
+ * the word face — it is a label about the word, not part of it.
+ */
+.partOfSpeech {
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}
+
+.definition {
+  margin: 0;
+  font-size: calc(17px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  color: var(--ws-ink);
+  /* Long-form reading measure. Past roughly 70 characters the eye loses the
+     start of the next line, and definitions are read closely. */
+  max-width: 62ch;
+}
+
+/*
+ * Example sentences.
+ *
+ * Indented behind a rule rather than italicised. Italic is the reflex here and
+ * it is the wrong one: these are quotations from real sources, often long, and
+ * a full sentence of italic serif at small size is markedly harder to read.
+ * The rule says "this is quoted" without touching the letterforms.
+ */
+.examples {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0 0 0 12px;
+  border-left: 2px solid var(--ws-line);
+  list-style: none;
+}
+
+.example {
+  margin: 0;
+  font-size: calc(15px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  color: var(--ws-ink-soft);
+  max-width: 62ch;
+}
+
+/*
+ * The disclosure.
+ *
+ * A plain text button, left-aligned with the definitions above it, because it
+ * is a continuation of the reading rather than an action on the page. Full
+ * width so the tap target spans the column at 375px.
+ */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--ws-font-body);
+  font-size: calc(15px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  color: var(--ws-accent);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The chevron. Rotates to point down when the rest is showing. */
+.chevron {
+  display: inline-flex;
+  transition: transform 200ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}

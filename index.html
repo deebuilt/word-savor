@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- iOS ignores the manifest's icon list entirely and reads this tag. With
+         no apple-touch-icon, adding the app to a home screen produces a
+         screenshot of the page rather than the mark. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- Tints the browser and status bar chrome around the app. Two values so
+         the chrome tracks the palette instead of leaving a paper-white bar
+         above a dark screen. -->
+    <meta name="theme-color" content="#faf7f2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#161513" media="(prefers-color-scheme: dark)" />
+    <!-- `viewport-fit=cover` lets the layout reach under the notch and the home
+         indicator, which is what makes `env(safe-area-inset-bottom)` in the
+         bottom bar mean anything. Without it iOS letterboxes the page and the
+         inset is always zero. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Catch a word in the wild, keep it, and practise using it until it is yours." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>WordSavor</title>
+
+    <!--
+      Apply the stored theme before first paint.
+
+      React mounts a frame or two after the document parses, so a theme applied
+      in a `useEffect` arrives after the browser has already painted the default
+      palette — a white flash on every cold open in dark mode. Reading the same
+      localStorage key here, synchronously, means the correct palette is on the
+      root element before anything is drawn.
+
+      Wrapped in try/catch because localStorage throws rather than returning
+      null in private browsing and when site data is blocked. Falling through to
+      the media query is the right answer in both cases.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('wordsavor:theme')
+          if (stored === 'light' || stored === 'dark') {
+            document.documentElement.setAttribute('data-theme', stored)
+          }
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

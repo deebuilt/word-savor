@@ -1,0 +1,116 @@
+/* A fieldset carries the group semantics for free, but brings a browser border
+   and padding that have to be cleared. */
+.group {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.legend {
+  padding: 0;
+  font-size: 13px;
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}
+
+.hint {
+  margin: 4px 0 12px;
+  max-width: 40ch;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ws-ink-soft);
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/*
+ * Each option is a preview first and a label second, so the sample sits above
+ * the name rather than beside it — the reader is choosing by how it looks, not
+ * by what it is called.
+ */
+.option {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--ws-line);
+  border-radius: 4px;
+  background: var(--ws-paper-raised);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+/*
+ * Selection is marked by border weight and colour together, never colour
+ * alone — the setting exists for readers with vision differences, and a state
+ * only distinguishable by hue is the wrong way to mark it.
+ */
+.selected {
+  border-color: var(--ws-accent);
+  box-shadow: inset 0 0 0 1px var(--ws-accent);
+  background: var(--ws-accent-soft);
+}
+
+/*
+ * The radio is visually hidden, not removed. `display: none` would take it out
+ * of the tab order and break arrow-key navigation within the group; this keeps
+ * both and lets the focus ring below do its job.
+ */
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Keyboard focus has to be visible on the card, since the input it belongs to
+   is not. `:focus-visible` keeps it off mouse and touch. */
+.option:has(.input:focus-visible) {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+}
+
+/* Font family, size, and weight are set inline per option — each preview has
+   to render in the face it offers. */
+.sample {
+  color: var(--ws-ink);
+  /* A long sample should not widen the sheet; it wraps instead. */
+  overflow-wrap: anywhere;
+}
+
+.sampleLarge {
+  letter-spacing: -0.01em;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: var(--ws-weight-body-medium);
+  color: var(--ws-ink);
+}
+
+.voice {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ws-ink-faint);
+}
