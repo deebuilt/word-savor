@@ -1,0 +1,29 @@
+.state {
+  margin: 8px 0 4px;
+  color: var(--ws-ink-soft);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pronunciation {
+  font-family: var(--ws-font-body);
+  font-size: calc(15px * var(--ws-scale-body));
+  color: var(--ws-ink-soft);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

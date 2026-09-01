@@ -60,11 +60,12 @@ export interface SavedWord {
   /** Spoken pronunciation, from dictionaryapi.dev's phonetics. */
   audioUrl?: string
   senses: Sense[]
+  /** FreeDictionary's Wiktionary terms, extended with Datamuse `rel_syn`/`rel_ant`. */
   synonyms: string[]
   antonyms: string[]
   etymology?: string
   /**
-   * Semantically associated words, from Datamuse `rel_trg`.
+   * Semantically associated words, from Datamuse `ml=` (means-like).
    *
    * Written at save time rather than on demand. This is what the constellations
    * view reads, and it is the one field that is expensive to backfill.

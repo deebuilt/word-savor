@@ -169,7 +169,10 @@ export function parseDictionary(
  * than whichever etymology Wiktionary happened to list first.
  */
 function collectSenses(entries: WireEntry[]): Sense[] {
-  const grouped = new Map<string, Sense[]>()
+  // Carries Wiktionary's own `tags` alongside each sense only long enough to
+  // rank it — `Sense` itself has no `tags` field, and it does not need one
+  // just to have existed transiently during a sort.
+  const grouped = new Map<string, { sense: Sense; tags: string[] }[]>()
   const order: string[] = []
 
   for (const entry of entries) {
@@ -186,10 +189,36 @@ function collectSenses(entries: WireEntry[]): Sense[] {
       if (!definition) continue
       // Wiktionary repeats identical definitions across etymology splits often
       // enough that dropping them here beats doing it in every consumer.
-      if (bucket.some((existing) => existing.definition === definition)) continue
+      if (bucket.some((existing) => existing.sense.definition === definition)) continue
       if (bucket.length >= MAX_SENSES_PER_PART_OF_SPEECH) continue
-      bucket.push({ partOfSpeech, definition, examples: exampleSentences(sense) })
+      bucket.push({
+        sense: { partOfSpeech, definition, examples: exampleSentences(sense) },
+        tags: sense.tags ?? [],
+      })
     }
+  }
+
+  /*
+   * Within each part of speech, the plainest sense leads rather than whichever
+   * one Wiktionary listed first.
+   *
+   * Wiktionary orders by etymology — oldest or most technical sense first,
+   * which is a lexicographer's ordering, not a reader's. "ad hominem" is the
+   * case that forced this: sense one is "Ellipsis of argumentum ad hominem: A
+   * fallacious objection to an argument or factual claim by appealing to a
+   * characteristic or belief of the person making the argument..." — one
+   * sentence, several subordinate clauses, and tagged `["abbreviation","alt
+   * of","ellipsis"]` — while sense two, tagged `["informal"]`, is "A personal
+   * attack." Both are the noun. The second is the one an actual reader wants
+   * first, and `plainnessScore` reads both the tags and the sentence itself to
+   * find it, rather than trusting Wiktionary's own order.
+   *
+   * A stable sort, not a filter: every sense collected above is kept, in a
+   * reordered sequence. Nothing here decides a sense does not belong — only
+   * which one leads.
+   */
+  for (const bucket of grouped.values()) {
+    bucket.sort((a, b) => plainnessScore(a) - plainnessScore(b))
   }
 
   /*
@@ -209,15 +238,85 @@ function collectSenses(entries: WireEntry[]): Sense[] {
   for (let round = 0; round < MAX_SENSES_PER_PART_OF_SPEECH; round += 1) {
     for (const partOfSpeech of order) {
       if (kept.size >= MAX_SENSES_TOTAL) break
-      const sense = grouped.get(partOfSpeech)?.[round]
-      if (sense) kept.add(sense)
+      const entry = grouped.get(partOfSpeech)?.[round]
+      if (entry) kept.add(entry.sense)
     }
   }
 
   return order.flatMap((partOfSpeech) =>
-    (grouped.get(partOfSpeech) ?? []).filter((sense) => kept.has(sense)),
+    (grouped.get(partOfSpeech) ?? [])
+      .map((entry) => entry.sense)
+      .filter((sense) => kept.has(sense)),
   )
 }
+
+/**
+ * Rank a sense by how plain it reads, lower is plainer.
+ *
+ * Three signals. Word count alone rewards *terse* over *plain*, and those are
+ * not the same thing — "inscription" is the case that forced the third one:
+ * every sense carries identical grammar tags, nothing in the tags
+ * distinguishes them, and "The act of inscribing." (four words) beats "Text
+ * carved on a wall or plaque..." (longer) on word count alone despite being
+ * the worse definition — it explains the noun by pointing back at its own
+ * verb, which teaches nothing to a reader who does not already know that verb.
+ *
+ * 1. **Wiktionary's own cross-reference tags** — `alt of`, `ellipsis`,
+ *    `abbreviation`, `initialism`, `synonym of`, and friends mark a sense as
+ *    "this is short for / another way of writing that", which is inherently a
+ *    worse primary definition than a sense that just says what the word means.
+ *    `informal`/`colloquial` are the opposite signal: Wiktionary itself is
+ *    marking that sense as the everyday one.
+ * 2. **Sentence shape** — word count, plus a penalty per semicolon and colon,
+ *    since those are where a Wiktionary definition chains a second and third
+ *    clause onto the first. "A personal attack." scores near zero on both
+ *    counts; "Ellipsis of argumentum ad hominem: A fallacious objection to an
+ *    argument or factual claim by appealing to..." scores high on both.
+ * 3. **Circular gloss patterns** — "The act of [verb]ing", "An instance of
+ *    [verb]ing", "The quality of being [adjective]", "The state of [verb]ing".
+ *    Wiktionary uses these often for a noun derived from a verb or adjective,
+ *    and they are short by construction regardless of how well they teach the
+ *    word — a flat penalty keeps word count from mistaking that shortness for
+ *    plainness.
+ */
+function plainnessScore(entry: { sense: Sense; tags: string[] }): number {
+  const tags = entry.tags.map((tag) => tag.toLowerCase())
+  const definition = entry.sense.definition
+
+  let score = definition.split(/\s+/).filter(Boolean).length
+  score += (definition.match(/[;:]/g)?.length ?? 0) * 8
+
+  if (tags.some((tag) => CROSS_REFERENCE_TAGS.has(tag))) score += 40
+  if (tags.some((tag) => PLAIN_REGISTER_TAGS.has(tag))) score -= 15
+  if (CIRCULAR_GLOSS.test(definition)) score += 20
+
+  return score
+}
+
+/**
+ * "The act of X-ing", "An instance of X-ing", "The quality/state of being X".
+ *
+ * Anchored to the start of the definition — these patterns only count as
+ * circular when they *are* the definition, not when a longer sense happens to
+ * contain the phrase "act of" partway through.
+ */
+const CIRCULAR_GLOSS = /^(the|an?)\s+(act|instance|state|quality)\s+of\b/i
+
+/** Marks a sense as pointing elsewhere rather than defining the word itself. */
+const CROSS_REFERENCE_TAGS = new Set([
+  'alt of',
+  'alternative form of',
+  'alternative spelling of',
+  'ellipsis',
+  'abbreviation',
+  'initialism',
+  'synonym of',
+  'obsolete',
+  'archaic',
+])
+
+/** Marks a sense as the everyday one, in Wiktionary's own judgment. */
+const PLAIN_REGISTER_TAGS = new Set(['informal', 'colloquial'])
 
 /**
  * Example sentences, falling back to quotations.

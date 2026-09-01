@@ -36,6 +36,18 @@ interface WireResult {
 
 export interface DatamuseResult {
   related: string[]
+  /**
+   * WordNet-backed synonyms and antonyms, `rel_syn=`/`rel_ant=`.
+   *
+   * A second signal alongside FreeDictionary's Wiktionary-sourced synonyms, not
+   * a replacement — the two sources miss different words. Verified live rather
+   * than trusted from docs, the same standard `rel_trg` failed: unlike that
+   * endpoint, `rel_syn` returns real results for literary vocabulary
+   * ("perspicacious" → sagacious, discerning, sapient, wise), so it earns a
+   * place `rel_trg` did not.
+   */
+  synonyms: string[]
+  antonyms: string[]
   /** Frequency per million words. Lower is rarer. */
   rarity?: number
   raw: unknown
@@ -50,23 +62,35 @@ export interface DatamuseResult {
  */
 const MAX_RELATED = 12
 
+/** Matches FreeDictionary's own cap, so neither source dominates the merge. */
+const MAX_SYN_ANT = 12
+
 export async function lookupDatamuse(rawWord: string): Promise<DatamuseResult | null> {
   const word = normaliseWord(rawWord)
   if (!word) return null
 
-  // Issued together rather than in sequence: they are independent, and two
-  // round trips one after the other doubles the wait for no reason.
-  const [associations, frequency] = await Promise.all([
+  // Issued together rather than in sequence: they are independent, and a round
+  // trip per call one after the other multiplies the wait for no reason.
+  const [associations, frequency, synonyms, antonyms] = await Promise.all([
     fetchAssociations(word),
     fetchRarity(word),
+    fetchRelated(word, 'rel_syn'),
+    fetchRelated(word, 'rel_ant'),
   ])
 
-  if (!associations && frequency === undefined) return null
+  if (!associations && frequency === undefined && !synonyms && !antonyms) return null
 
   return {
     related: associations?.words ?? [],
+    synonyms: synonyms?.words ?? [],
+    antonyms: antonyms?.words ?? [],
     rarity: frequency,
-    raw: { associations: associations?.raw ?? null, frequency },
+    raw: {
+      associations: associations?.raw ?? null,
+      frequency,
+      synonyms: synonyms?.raw ?? null,
+      antonyms: antonyms?.raw ?? null,
+    },
   }
 }
 
@@ -91,6 +115,34 @@ async function fetchAssociations(
     .map((entry) => entry.word?.trim() ?? '')
     .filter((value) => value.length > 0 && value.toLowerCase() !== word)
     .slice(0, MAX_RELATED)
+
+  return { words, raw: payload }
+}
+
+/**
+ * Words related by a Datamuse `rel_*` constraint — used here for `rel_syn`
+ * (WordNet synonyms) and `rel_ant` (WordNet antonyms).
+ *
+ * Shares its shape with `fetchAssociations` but is a separate function rather
+ * than a parameterised one: `ml=` and `rel_*=` are different query families
+ * with different score scales, and collapsing them would blur that these are
+ * two different questions asked of the same API.
+ */
+async function fetchRelated(
+  word: string,
+  relation: 'rel_syn' | 'rel_ant',
+): Promise<{ words: string[]; raw: unknown } | null> {
+  const url = `https://api.datamuse.com/words?${relation}=${encodeURIComponent(word)}&max=${MAX_SYN_ANT}`
+  const payload = await fetchJson<WireResult[]>(url, {
+    timeout: TIMEOUT.datamuse,
+    source: 'datamuse',
+  })
+  if (!Array.isArray(payload)) return null
+
+  const words = payload
+    .map((entry) => entry.word?.trim() ?? '')
+    .filter((value) => value.length > 0 && value.toLowerCase() !== word)
+    .slice(0, MAX_SYN_ANT)
 
   return { words, raw: payload }
 }

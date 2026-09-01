@@ -78,16 +78,33 @@ export default function App() {
   }, [refreshCounts])
 
   /*
-   * The open word, if any. Detail is a layer over the library rather than a
-   * sixth tab: the nav still shows Library as where you are, because that is
-   * where Back returns you.
+   * The trail of open words, if any. Detail is a layer over the library rather
+   * than a sixth tab: the nav still shows Library as where you are, because
+   * that is where Back eventually returns you.
+   *
+   * A stack rather than a single id: a related-word popup on the detail screen
+   * can open a second word's detail on top of the first, which a synonym's
+   * synonym can do again. Back pops one level at a time, so the trail a reader
+   * follows through a chain of synonyms is the trail they can retrace — the
+   * whole point of the popup being "read it without losing your place" is
+   * defeated if going one level deeper then costs the place you actually
+   * started from.
    */
-  const [openWordId, setOpenWordId] = useState<string | undefined>(undefined)
+  const [wordStack, setWordStack] = useState<string[]>([])
+  const openWordId = wordStack[wordStack.length - 1]
+  /** What Back returns to — the word beneath this one, or Library at the floor. */
+  const backToWordId = wordStack[wordStack.length - 2]
 
-  const closeWord = useCallback(() => setOpenWordId(undefined), [])
+  const openWord = useCallback((id: string) => {
+    setWordStack((stack) => [...stack, id])
+  }, [])
+
+  const closeWord = useCallback(() => {
+    setWordStack((stack) => stack.slice(0, -1))
+  }, [])
 
   const handleDeleted = useCallback(() => {
-    setOpenWordId(undefined)
+    setWordStack([])
     setLibraryToken((token) => token + 1)
     void refreshCounts()
   }, [refreshCounts])
@@ -100,7 +117,7 @@ export default function App() {
    * and Back would be the only way out of a screen you did not choose.
    */
   const selectTab = useCallback((next: TabKey) => {
-    setOpenWordId(undefined)
+    setWordStack([])
     setTab(next)
   }, [])
 
@@ -116,11 +133,14 @@ export default function App() {
                    than showing the previous word's content while it loads. */
                 key={openWordId}
                 wordId={openWordId}
+                backToWordId={backToWordId}
                 onBack={closeWord}
                 onDeleted={handleDeleted}
+                onOpenWord={openWord}
+                onSaved={handleSaved}
               />
             ) : (
-              <Library refreshToken={libraryToken} onOpenWord={setOpenWordId} />
+              <Library refreshToken={libraryToken} onOpenWord={openWord} />
             ))}
           {tab === 'lookup' && (
             <LookUp

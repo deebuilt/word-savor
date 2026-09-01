@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button, Modal, Tag, message } from 'antd'
 import { ArrowLeftOutlined, SoundOutlined } from '@ant-design/icons'
 import type { Encounter, SavedWord } from '../types/domain'
-import { deleteWord, getWord, listEncounters } from '../storage/db'
+import { deleteWord, getWord, listEncounters, saveWord } from '../storage/db'
+import { lookupWord, toSavedWord, type LookupResult } from '../api/lookup'
 import { rarityLabel } from '../domain/rarity'
 import { Word } from '../components/word/Word'
 import { SenseList } from '../components/word/SenseList'
 import { StatusMark } from '../components/word/StatusMark'
+import { RelatedWordCard } from '../components/word/RelatedWordCard'
 import styles from './WordDetail.module.css'
 
 /**
@@ -25,16 +27,51 @@ import styles from './WordDetail.module.css'
 
 interface WordDetailProps {
   wordId: string
+  /**
+   * The word beneath this one on the navigation stack, if any.
+   *
+   * Drives the back button's label — "sagacious" rather than a blanket
+   * "Library" when Back is really returning to another word's detail, opened
+   * from a related-word popup. `undefined` at the floor of the stack, where
+   * Back does mean Library.
+   */
+  backToWordId?: string
   onBack: () => void
   /** Called after a delete, so the library re-reads. */
   onDeleted: () => void
+  /** Opens another word's detail screen, on top of this one. */
+  onOpenWord: (wordId: string) => void
+  /** Told about a save, from this screen or a related-word popup, so counts refresh. */
+  onSaved?: () => void
 }
 
-export function WordDetail({ wordId, onBack, onDeleted }: WordDetailProps) {
+export function WordDetail({
+  wordId,
+  backToWordId,
+  onBack,
+  onDeleted,
+  onOpenWord,
+  onSaved,
+}: WordDetailProps) {
   const [word, setWord] = useState<SavedWord | undefined>(undefined)
   const [encounters, setEncounters] = useState<Encounter[]>([])
+  /**
+   * A word not (yet) in the library, shown from a live lookup.
+   *
+   * Opening a related word's detail must not save it — only a tap on Save may
+   * ever write to the library. So when `getWord` comes back empty, this is
+   * the fallback: the same screen, sourced from the network instead of
+   * storage, with Save offered here rather than assumed.
+   */
+  const [preview, setPreview] = useState<LookupResult | undefined>(undefined)
+  const [previewMissing, setPreviewMissing] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [toast, toastHolder] = message.useMessage()
+  /** The term open in the related-word popup, if any. */
+  const [openTerm, setOpenTerm] = useState<string | undefined>(undefined)
+  /** The display form of `backToWordId`, for the back button's label. */
+  const [backLabel, setBackLabel] = useState<string | undefined>(undefined)
 
   /*
    * No `setLoading(true)` here to reset between words: the shell keys this
@@ -48,15 +85,83 @@ export function WordDetail({ wordId, onBack, onDeleted }: WordDetailProps) {
     void (async () => {
       const [found, met] = await Promise.all([getWord(wordId), listEncounters(wordId)])
       if (cancelled) return
-      setWord(found)
-      setEncounters(met)
-      setLoading(false)
+
+      if (found) {
+        setWord(found)
+        setEncounters(met)
+        setLoading(false)
+        return
+      }
+
+      // Not in the library — try the network before concluding it was deleted.
+      // Distinguishes "opened from a synonym you haven't kept" from "you came
+      // back to a word you removed," which read very differently on screen.
+      try {
+        const result = await lookupWord(wordId)
+        if (cancelled) return
+        setPreview(result)
+      } catch {
+        if (cancelled) return
+        setPreviewMissing(true)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     })()
 
     return () => {
       cancelled = true
     }
   }, [wordId])
+
+  // Resolves the label for what Back returns to. Storage first, since most
+  // words one level up are already saved; a network fallback covers the case
+  // of backing out through a whole unsaved chain.
+  useEffect(() => {
+    if (!backToWordId) {
+      setBackLabel(undefined)
+      return
+    }
+
+    let cancelled = false
+
+    void (async () => {
+      const saved = await getWord(backToWordId)
+      if (cancelled) return
+      if (saved) {
+        setBackLabel(saved.word)
+        return
+      }
+
+      try {
+        const result = await lookupWord(backToWordId)
+        if (!cancelled) setBackLabel(result.word)
+      } catch {
+        if (!cancelled) setBackLabel(backToWordId)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [backToWordId])
+
+  const save = useCallback(async () => {
+    if (!preview || saving) return
+    setSaving(true)
+
+    try {
+      const saved = toSavedWord(preview, { source: 'manual' })
+      await saveWord(saved)
+      toast.success(`${saved.word} saved.`)
+      setWord(saved)
+      setPreview(undefined)
+      onSaved?.()
+    } catch {
+      toast.error('Could not save that word. Try again.')
+    } finally {
+      setSaving(false)
+    }
+  }, [preview, saving, toast, onSaved])
 
   const confirmDelete = useCallback(() => {
     if (!word) return
@@ -89,47 +194,60 @@ export function WordDetail({ wordId, onBack, onDeleted }: WordDetailProps) {
   if (loading) {
     return (
       <div className={styles.screen}>
-        <BackButton onBack={onBack} />
+        <BackButton label={backLabel} onBack={onBack} />
         <p className={styles.state}>Opening…</p>
       </div>
     )
   }
 
-  if (!word) {
+  if (!word && !preview) {
     return (
       <div className={styles.screen}>
-        <BackButton onBack={onBack} />
-        <p className={styles.state}>That word is no longer in your library.</p>
+        <BackButton label={backLabel} onBack={onBack} />
+        <p className={styles.state}>
+          {previewMissing
+            ? 'No dictionary entry for this word.'
+            : 'That word is no longer in your library.'}
+        </p>
       </div>
     )
   }
 
-  const rarity = rarityLabel(word.rarity)
+  // Read from whichever source resolved — a saved word, or a live preview of
+  // one that has not been kept. Both carry the same reference fields; the
+  // difference is what actions are on offer below.
+  const shown = word ?? preview!
+  const rarity = word ? rarityLabel(word.rarity) : undefined
 
   return (
     <div className={styles.screen}>
       {toastHolder}
-      <BackButton onBack={onBack} />
+      <BackButton label={backLabel} onBack={onBack} />
 
       <div className={styles.head}>
         <Word size="display" as="h1">
-          {word.word}
+          {shown.word}
         </Word>
 
         <div className={styles.meta}>
-          <StatusMark status={word.status} showLabel />
-          {word.pronunciation && (
-            <span className={styles.pronunciation}>{word.pronunciation}</span>
+          {word ? (
+            <StatusMark status={word.status} showLabel />
+          ) : (
+            <span className={styles.unsaved}>Not in your library</span>
           )}
-          {word.audioUrl && <AudioButton src={word.audioUrl} word={word.word} />}
+          {shown.pronunciation && (
+            <span className={styles.pronunciation}>{shown.pronunciation}</span>
+          )}
+          {shown.audioUrl && <AudioButton src={shown.audioUrl} word={shown.word} />}
           {rarity && <span className={styles.rarity}>{rarity}</span>}
         </div>
       </div>
 
       <div className={styles.senses}>
-        {/* Collapsed here, unlike the lookup result: this word is already
-            yours, and the primary sense is what you came back for. */}
-        <SenseList senses={word.senses} />
+        {/* Collapsed for a saved word — it is already yours, and the primary
+            sense is what you came back for. Expanded for a preview, same as
+            the lookup result: deciding whether to keep it needs to see it. */}
+        <SenseList senses={shown.senses} expanded={!word} />
       </div>
 
       {encounters.length > 0 && (
@@ -145,62 +263,80 @@ export function WordDetail({ wordId, onBack, onDeleted }: WordDetailProps) {
         </section>
       )}
 
-      {word.synonyms.length > 0 && (
+      {shown.synonyms.length > 0 && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Similar</h2>
           <div className={styles.terms}>
-            {word.synonyms.map((term) => (
-              <Tag key={term}>{term}</Tag>
+            {shown.synonyms.map((term) => (
+              <TermTag key={term} term={term} onOpen={setOpenTerm} />
             ))}
           </div>
         </section>
       )}
 
-      {word.antonyms.length > 0 && (
+      {shown.antonyms.length > 0 && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Opposite</h2>
           <div className={styles.terms}>
-            {word.antonyms.map((term) => (
-              <Tag key={term}>{term}</Tag>
+            {shown.antonyms.map((term) => (
+              <TermTag key={term} term={term} onOpen={setOpenTerm} />
             ))}
           </div>
         </section>
       )}
 
-      {word.related.length > 0 && (
+      {shown.related.length > 0 && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Related</h2>
           <div className={styles.terms}>
-            {word.related.map((term) => (
-              <Tag key={term}>{term}</Tag>
+            {shown.related.map((term) => (
+              <TermTag key={term} term={term} onOpen={setOpenTerm} />
             ))}
           </div>
         </section>
       )}
 
-      {word.etymology && (
+      {shown.etymology && (
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Origin</h2>
-          <p className={styles.etymology}>{word.etymology}</p>
+          <p className={styles.etymology}>{shown.etymology}</p>
         </section>
       )}
 
-      <div className={styles.danger}>
-        <Button danger onClick={confirmDelete}>
-          Delete
-        </Button>
-      </div>
+      {word ? (
+        <div className={styles.danger}>
+          <Button danger onClick={confirmDelete}>
+            Delete
+          </Button>
+        </div>
+      ) : (
+        <div className={styles.saveRow}>
+          <Button type="primary" size="large" loading={saving} onClick={() => void save()}>
+            Save to library
+          </Button>
+        </div>
+      )}
+
+      <RelatedWordCard
+        term={openTerm}
+        onClose={() => setOpenTerm(undefined)}
+        onOpenDetail={(id) => {
+          setOpenTerm(undefined)
+          onOpenWord(id)
+        }}
+        onSaved={onSaved}
+      />
     </div>
   )
 }
 
 /* -------------------------------------------------------------------------- */
 
-function BackButton({ onBack }: { onBack: () => void }) {
+function BackButton({ label, onBack }: { label?: string; onBack: () => void }) {
   return (
     <button type="button" className={styles.back} onClick={onBack}>
       <ArrowLeftOutlined />
-      Library
+      {label ?? 'Library'}
     </button>
   )
 }
@@ -225,6 +361,32 @@ function EncounterEntry({ encounter }: { encounter: Encounter }) {
       <p className={styles.encounterContext}>{encounter.context}</p>
       {attribution && <p className={styles.encounterMeta}>{attribution}</p>}
     </>
+  )
+}
+
+/**
+ * A synonym, antonym, or related term, tappable to open in place.
+ *
+ * A plain `Tag` with an `onClick` rather than swapping in a `Button` — antd's
+ * Tag already renders a `<span>` with a border and a background, which is the
+ * exact look this needs; the click handler is the only thing missing.
+ */
+function TermTag({ term, onOpen }: { term: string; onOpen: (term: string) => void }) {
+  return (
+    <Tag
+      role="button"
+      tabIndex={0}
+      className={styles.termTag}
+      onClick={() => onOpen(term)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onOpen(term)
+        }
+      }}
+    >
+      {term}
+    </Tag>
   )
 }
 

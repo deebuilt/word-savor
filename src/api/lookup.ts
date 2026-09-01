@@ -108,8 +108,8 @@ export async function lookupWord(rawWord: string): Promise<LookupResult> {
     id,
     word: dictionary.word,
     senses: dictionary.senses,
-    synonyms: dictionary.synonyms,
-    antonyms: dictionary.antonyms,
+    synonyms: mergeTerms(dictionary.synonyms, datamuse?.synonyms),
+    antonyms: mergeTerms(dictionary.antonyms, datamuse?.antonyms),
     related: datamuse?.related ?? [],
     pronunciation: dictionary.pronunciation,
     audioUrl,
@@ -136,6 +136,8 @@ function cacheKey(source: CachedLookup['source'], word: string): string {
 interface DatamuseCachePayload {
   associations: unknown
   frequency: number | undefined
+  synonyms?: unknown
+  antonyms?: unknown
 }
 
 interface AudioCachePayload {
@@ -169,8 +171,8 @@ async function readFromCache(word: string): Promise<LookupResult | null> {
     id: word,
     word: dictionary.word,
     senses: dictionary.senses,
-    synonyms: dictionary.synonyms,
-    antonyms: dictionary.antonyms,
+    synonyms: mergeTerms(dictionary.synonyms, readCachedTerms(datamuse?.synonyms)),
+    antonyms: mergeTerms(dictionary.antonyms, readCachedTerms(datamuse?.antonyms)),
     related: readCachedRelated(datamuse),
     pronunciation: dictionary.pronunciation,
     audioUrl: audio?.audioUrl,
@@ -192,6 +194,39 @@ function readCachedRelated(payload: DatamuseCachePayload | undefined): string[] 
   return (payload.associations as { word?: string }[])
     .map((entry) => entry.word?.trim() ?? '')
     .filter((value) => value.length > 0)
+}
+
+/** Same wire shape as `readCachedRelated`, for the `rel_syn`/`rel_ant` payloads. */
+function readCachedTerms(payload: unknown): string[] {
+  if (!Array.isArray(payload)) return []
+
+  return (payload as { word?: string }[])
+    .map((entry) => entry.word?.trim() ?? '')
+    .filter((value) => value.length > 0)
+}
+
+/**
+ * Combine FreeDictionary's terms with Datamuse's, deduplicated.
+ *
+ * FreeDictionary leads — it is the required source and already ordered by
+ * Wiktionary's own prominence — and Datamuse's WordNet terms fill in behind it,
+ * capped at the same total either source alone would carry. A term both
+ * sources agree on is not repeated.
+ */
+function mergeTerms(primary: string[], secondary: string[] | undefined): string[] {
+  if (!secondary || secondary.length === 0) return primary
+
+  const seen = new Set(primary.map((term) => term.toLowerCase()))
+  const merged = [...primary]
+
+  for (const term of secondary) {
+    const key = term.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    merged.push(term)
+  }
+
+  return merged.slice(0, 12)
 }
 
 /**

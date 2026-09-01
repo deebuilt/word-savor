@@ -127,6 +127,16 @@
   gap: 8px;
 }
 
+.termTag {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.termTag:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+}
+
 /* Encounters --------------------------------------------------------------- */
 
 .encounters {
@@ -174,6 +184,21 @@
   line-height: calc(1.55 * var(--ws-leading-body));
   color: var(--ws-ink-soft);
   max-width: 62ch;
+}
+
+.unsaved {
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  color: var(--ws-ink-faint);
+}
+
+/* Save ----------------------------------------------------------------------
+   The unsaved counterpart to .danger below — same position, same weight, so a
+   preview and a kept word feel like the same screen with one action swapped. */
+.saveRow {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ws-line);
 }
 
 /* Danger ------------------------------------------------------------------- */
