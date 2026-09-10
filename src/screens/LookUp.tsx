@@ -8,6 +8,7 @@ import {
   type LookupResult,
 } from '../api/lookup'
 import { normaliseWord } from '../api/http'
+import { suggestSpellings } from '../api/datamuse'
 import { addEncounter, getWord, saveWord } from '../storage/db'
 import { Word } from '../components/word/Word'
 import { SenseList } from '../components/word/SenseList'
@@ -51,7 +52,7 @@ type Status =
   | { kind: 'idle' }
   | { kind: 'searching' }
   | { kind: 'found'; result: LookupResult; alreadySaved: boolean }
-  | { kind: 'missing'; word: string }
+  | { kind: 'missing'; word: string; suggestions?: string[] }
   | { kind: 'offline' }
 
 export function LookUp({ onSaved, initialWord, initialContext }: LookUpProps) {
@@ -103,11 +104,24 @@ export function LookUp({ onSaved, initialWord, initialContext }: LookUpProps) {
         setStatus({ kind: 'found', result, alreadySaved: Boolean(existing) })
       } catch (error) {
         if (ticket !== requestId.current) return
-        setStatus(
-          error instanceof WordNotFoundError
-            ? { kind: 'missing', word: term }
-            : { kind: 'offline' },
-        )
+
+        if (!(error instanceof WordNotFoundError)) {
+          setStatus({ kind: 'offline' })
+          return
+        }
+
+        // The not-found message goes up at once. Suggestions are a non-blocking
+        // enrichment on top of it — the same posture the successful path takes
+        // with its optional sources — so the reader is never left staring at a
+        // spinner while a "did you mean" is fetched.
+        setStatus({ kind: 'missing', word: term })
+
+        const suggestions = await suggestSpellings(term)
+        // Guarded again: a correction typed while this was in flight must win,
+        // and an empty list is left as the plain not-found state rather than
+        // rewritten into an identical one.
+        if (ticket !== requestId.current || suggestions.length === 0) return
+        setStatus({ kind: 'missing', word: term, suggestions })
       }
     },
     [],
@@ -127,6 +141,22 @@ export function LookUp({ onSaved, initialWord, initialContext }: LookUpProps) {
     searchedShare.current = initialWord
     void search(initialWord, { keepContext: true })
   }, [initialWord, search])
+
+  /*
+   * Tapping a suggestion corrects the field and searches, in place.
+   *
+   * Setting `query` first keeps the box honest — it now shows the word actually
+   * on screen — and re-uses `search` so a correction is the same inline replace
+   * a retyped word would be, never a navigation. This is the "correcting a typo
+   * should not mean going back" the screen is built around.
+   */
+  const chooseSuggestion = useCallback(
+    (term: string) => {
+      setQuery(term)
+      void search(term)
+    },
+    [search],
+  )
 
   const save = useCallback(async () => {
     if (status.kind !== 'found' || saving) return
@@ -237,6 +267,27 @@ export function LookUp({ onSaved, initialWord, initialContext }: LookUpProps) {
             Check the spelling. Wiktionary also misses very new slang and most
             proper nouns.
           </p>
+
+          {status.suggestions && status.suggestions.length > 0 && (
+            <div className={styles.suggestions}>
+              <p className={styles.suggestionsLabel}>Did you mean</p>
+              <div className={styles.suggestionTerms}>
+                {status.suggestions.map((term) => (
+                  /* A real button, not a styled tag: it is the primary action of
+                     this state, and it must be focusable and announced as
+                     something that can be pressed. */
+                  <button
+                    key={term}
+                    type="button"
+                    className={styles.suggestion}
+                    onClick={() => chooseSuggestion(term)}
+                  >
+                    {term}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

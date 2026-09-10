@@ -176,6 +176,56 @@
 }
 
 /*
+ * "Did you mean" — spelling suggestions under a not-found word.
+ *
+ * Centred to sit with the not-found message above it, which is centred too. The
+ * chips are the word face rather than the body face: they are words to read and
+ * choose, the same as any other word the app puts in front of you.
+ */
+.suggestions {
+  margin-top: 24px;
+}
+
+.suggestionsLabel {
+  margin: 0 0 12px;
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}
+
+.suggestionTerms {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.suggestion {
+  font-family: var(--ws-font-word);
+  font-size: calc(16px * var(--ws-scale-word));
+  padding: 6px 14px;
+  border: 1px solid var(--ws-line);
+  border-radius: 999px;
+  background: none;
+  color: var(--ws-accent);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.suggestion:hover {
+  border-color: var(--ws-line-strong);
+  color: var(--ws-ink);
+}
+
+.suggestion:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+}
+
+/*
  * The empty state, before anything has been searched.
  *
  * Quiet on purpose. This screen opens with a cursor in a field, and a large

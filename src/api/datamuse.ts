@@ -65,6 +65,15 @@ const MAX_RELATED = 12
 /** Matches FreeDictionary's own cap, so neither source dominates the merge. */
 const MAX_SYN_ANT = 12
 
+/**
+ * How many spelling suggestions to offer.
+ *
+ * Small on purpose. This is a "did you mean" under a not-found word, not a list
+ * to browse — five is enough for the intended word to be among them and few
+ * enough to read at a glance without the screen becoming a menu.
+ */
+const MAX_SUGGESTIONS = 5
+
 export async function lookupDatamuse(rawWord: string): Promise<DatamuseResult | null> {
   const word = normaliseWord(rawWord)
   if (!word) return null
@@ -92,6 +101,46 @@ export async function lookupDatamuse(rawWord: string): Promise<DatamuseResult | 
       antonyms: antonyms?.raw ?? null,
     },
   }
+}
+
+/**
+ * Spelling suggestions for a word the dictionary did not recognise.
+ *
+ * Uses Datamuse's `/sug` endpoint — the one purpose-built for "did you mean". It
+ * is fuzzy rather than exact, so a word just overheard and typed by ear
+ * ("perspicasious") comes back with the real spelling ranked near the top. That
+ * makes it a different tool from the `sp=` this module uses for rarity, which
+ * matches a spelling *pattern* rather than correcting a wrong one.
+ *
+ * Best-effort in the same way every other Datamuse call here is: it returns an
+ * empty list on any failure and never throws. A missing suggestion must not turn
+ * a plain "not found" into an error — the reader still needs to read the
+ * not-found message either way.
+ *
+ * NOTE: unlike the rest of this module, this endpoint choice could not be
+ * verified against the live API when it was written — the build sandbox blocks
+ * egress to api.datamuse.com. It runs from the browser at runtime, where the
+ * other Datamuse calls already succeed; the ranking is worth a spot-check on a
+ * real device.
+ */
+export async function suggestSpellings(rawWord: string): Promise<string[]> {
+  const word = normaliseWord(rawWord)
+  if (!word) return []
+
+  const url = `https://api.datamuse.com/sug?s=${encodeURIComponent(word)}&max=${MAX_SUGGESTIONS}`
+  const payload = await fetchJson<WireResult[]>(url, {
+    timeout: TIMEOUT.datamuse,
+    source: 'datamuse',
+  })
+  if (!Array.isArray(payload)) return []
+
+  return payload
+    .map((entry) => entry.word?.trim() ?? '')
+    // Drop the word the reader already typed. `/sug` can echo it back when the
+    // typo happens to be a real but rarer word, and offering someone their own
+    // spelling as the correction reads as a bug.
+    .filter((value) => value.length > 0 && value.toLowerCase() !== word)
+    .slice(0, MAX_SUGGESTIONS)
 }
 
 /**
