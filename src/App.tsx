@@ -8,6 +8,7 @@ import { TopBar } from './components/chrome/TopBar'
 import { TypefacePicker } from './components/chrome/TypefacePicker'
 import { Library } from './screens/Library'
 import { LookUp } from './screens/LookUp'
+import { Practice } from './screens/Practice'
 import { WordDetail } from './screens/WordDetail'
 import { clearShareUrl, readSharedCapture } from './domain/shareTarget'
 import { listDueWords } from './storage/db'
@@ -149,9 +150,8 @@ export default function App() {
               initialContext={SHARED?.context}
             />
           )}
-          {(tab === 'practice' || tab === 'progress' || tab === 'more') && (
-            <Placeholder tab={tab} faces={faces} />
-          )}
+          {tab === 'practice' && <Practice onProgress={refreshCounts} />}
+          {(tab === 'progress' || tab === 'more') && <Placeholder tab={tab} faces={faces} />}
         </main>
         <BottomBar active={tab} onSelect={selectTab} dueCount={dueCount} />
       </div>
@@ -162,7 +162,7 @@ export default function App() {
 /* -------------------------------------------------------------------------- */
 
 interface PlaceholderProps {
-  tab: 'practice' | 'progress' | 'more'
+  tab: 'progress' | 'more'
   faces: ReturnType<typeof useTypefaces>
 }
 
@@ -217,23 +217,10 @@ function Placeholder({ tab, faces }: PlaceholderProps) {
     )
   }
 
-  const COPY: Record<'practice' | 'progress', { title: string; body: string }> = {
-    practice: {
-      title: 'Practice',
-      body: 'Words that are due, and a prompt to use each one.',
-    },
-    progress: {
-      title: 'Progress',
-      body: 'Streaks, rarity, and every sentence you have written.',
-    },
-  }
-
-  const { title, body } = COPY[tab]
-
   return (
     <div className={styles.screen}>
-      <h1 className={styles.title}>{title}</h1>
-      <p className={styles.body}>{body}</p>
+      <h1 className={styles.title}>Progress</h1>
+      <p className={styles.body}>Streaks, rarity, and every sentence you have written.</p>
     </div>
   )
 }

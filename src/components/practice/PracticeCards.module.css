@@ -1,0 +1,284 @@
+/*
+ * Shared shell for every practice card.
+ *
+ * One visual system across the usage check-in and all four drill types, so a
+ * session reads as one activity with different questions rather than several
+ * screens stitched together. Cards are centred and unrounded, matching the
+ * rest of the app's flat, editorial surfaces.
+ */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+}
+
+.eyebrow {
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}
+
+/* Usage check-in --------------------------------------------------------------- */
+
+.prompt {
+  margin: 12px 0 0;
+}
+
+.answers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 32px;
+}
+
+.answer {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  border: 1px solid var(--ws-line);
+  border-radius: 4px;
+  background: var(--ws-paper-raised);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.answer:hover {
+  border-color: var(--ws-line-strong);
+  background: var(--ws-paper-sunken);
+}
+
+.answer:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: -2px;
+}
+
+.answerLabel {
+  font-family: var(--ws-font-body);
+  font-size: calc(16px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  color: var(--ws-ink);
+}
+
+.answerHint {
+  font-size: calc(13px * var(--ws-scale-body));
+  color: var(--ws-ink-faint);
+}
+
+.answerPicked {
+  border-color: var(--ws-accent);
+  background: var(--ws-accent-soft);
+}
+
+.answer:disabled {
+  cursor: default;
+}
+
+/* Fill in the blank ----------------------------------------------------------- */
+
+.sentence {
+  margin: 16px 0 0;
+  max-width: 52ch;
+  font-size: calc(21px * var(--ws-scale-body));
+  line-height: calc(1.6 * var(--ws-leading-body));
+  color: var(--ws-ink);
+}
+
+.blank {
+  display: inline-block;
+  min-width: 3ch;
+  padding: 0 4px;
+  border-bottom: 2px solid var(--ws-line-strong);
+  font-family: var(--ws-font-word);
+  font-weight: var(--ws-weight-word-medium);
+  color: var(--ws-ink);
+}
+
+.inputRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.textInput {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--ws-line-strong);
+  border-radius: 4px;
+  background: var(--ws-paper-raised);
+  font-family: var(--ws-font-body);
+  font-size: calc(16px * var(--ws-scale-body));
+  color: var(--ws-ink);
+}
+
+.textInput:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: -1px;
+}
+
+.checkButton {
+  flex: none;
+  height: 44px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 4px;
+  background: var(--ws-accent);
+  color: var(--ws-paper);
+  font-family: var(--ws-font-body);
+  font-size: calc(15px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.checkButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Synonym match / odd one out ------------------------------------------------- */
+
+.definitionLarge {
+  margin: 16px 0 0;
+  max-width: 48ch;
+  font-size: calc(19px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  color: var(--ws-ink);
+}
+
+.options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  padding: 12px;
+  border: 1px solid var(--ws-line);
+  border-radius: 4px;
+  background: var(--ws-paper-raised);
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.option:hover {
+  border-color: var(--ws-line-strong);
+  background: var(--ws-paper-sunken);
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: -2px;
+}
+
+.option:disabled {
+  cursor: default;
+}
+
+.optionCorrect {
+  border-color: var(--ws-success);
+  background: var(--ws-success-soft);
+}
+
+.optionIncorrect {
+  border-color: var(--ws-danger);
+  background: var(--ws-paper-sunken);
+}
+
+/* Typed-answer self-report -------------------------------------------------- */
+
+.closeLink {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: var(--ws-font-body);
+  font-size: calc(15px * var(--ws-scale-body));
+  color: var(--ws-accent);
+  text-decoration: underline;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Answer strip --------------------------------------------------------------- */
+
+/*
+ * What every drill appends below the question once answered — the question
+ * itself stays on screen above this, unlike an earlier version that replaced
+ * it with a separate reveal screen and lost the thing the answer was meant to
+ * be checked against.
+ */
+
+.answerStrip {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ws-line);
+}
+
+.revealCorrect {
+  margin: 0;
+  font-family: var(--ws-font-body);
+  font-size: calc(19px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  color: var(--ws-success);
+}
+
+.revealIncorrect {
+  margin: 0;
+  font-family: var(--ws-font-body);
+  font-size: calc(19px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  color: var(--ws-danger);
+}
+
+.revealReference {
+  margin-top: 16px;
+}
+
+.referenceLabel {
+  margin: 0 0 8px;
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}
+
+.terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.termTag {
+  cursor: default;
+}
+
+.nextButton {
+  align-self: flex-start;
+  margin-top: 24px;
+  height: 44px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 4px;
+  background: var(--ws-accent);
+  color: var(--ws-paper);
+  font-family: var(--ws-font-body);
+  font-size: calc(15px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
