@@ -19,7 +19,12 @@ import type { SavedWord } from '../types/domain'
  * inventing a distractor or a giveaway blank.
  */
 
-export type DrillKind = 'definition-match' | 'fill-blank' | 'synonym-match' | 'odd-one-out'
+export type DrillKind =
+  | 'definition-match'
+  | 'fill-blank'
+  | 'fragment-cloze'
+  | 'synonym-match'
+  | 'odd-one-out'
 
 export interface DefinitionMatchDrill {
   kind: 'definition-match'
@@ -33,6 +38,17 @@ export interface FillBlankDrill {
   /** The example sentence with the target word masked. */
   before: string
   after: string
+}
+
+export interface FragmentClozeDrill {
+  kind: 'fragment-cloze'
+  word: SavedWord
+  /** A usage fragment with the target word masked. */
+  before: string
+  after: string
+  /** The word itself, shuffled in among distractors. */
+  options: string[]
+  answer: string
 }
 
 export interface SynonymMatchDrill {
@@ -52,7 +68,12 @@ export interface OddOneOutDrill {
   impostor: string
 }
 
-export type Drill = DefinitionMatchDrill | FillBlankDrill | SynonymMatchDrill | OddOneOutDrill
+export type Drill =
+  | DefinitionMatchDrill
+  | FillBlankDrill
+  | FragmentClozeDrill
+  | SynonymMatchDrill
+  | OddOneOutDrill
 
 /**
  * Every full-sentence example across all of a word's senses, in the order
@@ -67,24 +88,51 @@ export type Drill = DefinitionMatchDrill | FillBlankDrill | SynonymMatchDrill | 
  * catches most of the difference without needing real NLP.
  */
 function fullSentenceExamples(word: SavedWord): string[] {
+  return examplesWithWord(word).filter(isFullSentence)
+}
+
+/**
+ * Word-containing examples that are *not* full sentences — the bare
+ * collocations ("obfuscate facts", "a bespoke suit") that `fullSentenceExamples`
+ * throws out. They give the answer away in a *typed* blank, but as a
+ * multiple-choice cloze they are fair game and let fragment-only words carry a
+ * blank drill instead of wasting their example data. Two words minimum, so
+ * masking the target still leaves some context to read.
+ */
+function fragmentExamples(word: SavedWord): string[] {
+  return examplesWithWord(word).filter(
+    (text) => !isFullSentence(text) && text.split(/\s+/).length >= 2,
+  )
+}
+
+/** Deduped, trimmed examples across all senses that contain the word as a whole word. */
+function examplesWithWord(word: SavedWord): string[] {
   const wordPattern = new RegExp(`\\b${escapeRegExp(word.word)}\\b`, 'i')
   const seen = new Set<string>()
-  const examples: string[] = []
+  const out: string[] = []
 
   for (const sense of word.senses) {
     for (const example of sense.examples) {
       const trimmed = example.trim()
       if (!wordPattern.test(trimmed)) continue
-      if (!/^[A-Z]/.test(trimmed) || !/[.?!]$/.test(trimmed)) continue
-      if (trimmed.split(/\s+/).length < 4) continue
       const key = trimmed.toLowerCase()
       if (seen.has(key)) continue
       seen.add(key)
-      examples.push(trimmed)
+      out.push(trimmed)
     }
   }
 
-  return examples
+  return out
+}
+
+/**
+ * A capitalised, terminally punctuated clause of four or more words — a real
+ * sentence rather than a bare collocation. A cheap filter that catches most of
+ * the difference ("Before leaving the scene, the murderer set a fire in order
+ * to obfuscate any evidence." vs "obfuscate facts") without needing real NLP.
+ */
+function isFullSentence(text: string): boolean {
+  return /^[A-Z]/.test(text) && /[.?!]$/.test(text) && text.split(/\s+/).length >= 4
 }
 
 export function buildDefinitionMatch(word: SavedWord): DefinitionMatchDrill | undefined {
@@ -127,15 +175,11 @@ export function buildSynonymMatch(word: SavedWord, pool: SavedWord[]): SynonymMa
   const answer = word.synonyms.find((synonym) => !definitionContains(definition, synonym))
   if (!answer) return undefined
 
-  // Distractors: other saved words' display forms, never a synonym of this
-  // one — Datamuse's associations overlap enough that a second correct answer
-  // is a real risk otherwise.
-  const distractorPool = pool
-    .filter((candidate) => candidate.id !== word.id)
-    .map((candidate) => candidate.word)
-    .filter((term) => !word.synonyms.some((syn) => syn.toLowerCase() === term.toLowerCase()))
-
-  const distractors = pickRandom(distractorPool, 3)
+  // Distractors fall back through antonyms → other saved words → a common-word
+  // list, so this drill works from the very first saved word instead of being
+  // skipped until the library holds four. Antonyms are included: telling a
+  // synonym from an antonym given the meaning is a fair test.
+  const distractors = pickDistractors(word, pool, 3, { includeAntonyms: true })
   if (distractors.length < 3) return undefined
 
   return {
@@ -144,6 +188,39 @@ export function buildSynonymMatch(word: SavedWord, pool: SavedWord[]): SynonymMa
     definition,
     options: shuffle([answer, ...distractors]),
     answer,
+  }
+}
+
+/**
+ * A usage fragment with the word masked, answered by picking from four.
+ *
+ * The counterpart to the typed fill-blank: that one needs a real sentence,
+ * because a short collocation gives the answer away by shape. As a *pick*, the
+ * same fragment is fair — the reader chooses rather than reconstructs — so
+ * words that only have collocations still get a blank-style drill.
+ *
+ * Antonyms are *not* used as distractors here: an antonym can genuinely fit a
+ * collocation ("a plain suit" beside "a bespoke suit"), so it would not be a
+ * clean wrong answer the way it is against a definition.
+ */
+export function buildFragmentCloze(word: SavedWord, pool: SavedWord[]): FragmentClozeDrill | undefined {
+  const fragments = fragmentExamples(word)
+  if (fragments.length === 0) return undefined
+
+  const fragment = fragments[Math.floor(Math.random() * fragments.length)]
+  const match = new RegExp(`\\b${escapeRegExp(word.word)}\\b`, 'i').exec(fragment)
+  if (!match) return undefined
+
+  const distractors = pickDistractors(word, pool, 3, { includeAntonyms: false })
+  if (distractors.length < 3) return undefined
+
+  return {
+    kind: 'fragment-cloze',
+    word,
+    before: fragment.slice(0, match.index),
+    after: fragment.slice(match.index + match[0].length),
+    options: shuffle([word.word, ...distractors]),
+    answer: word.word,
   }
 }
 
@@ -177,14 +254,15 @@ export function buildOddOneOut(word: SavedWord, pool: SavedWord[]): OddOneOutDri
  *
  * Recall before recognition: definition match (type the word from its
  * meaning) and fill-blank (type it from a real sentence) come first, because
- * typing the word is the harder, more useful skill. Synonym match and
- * odd-one-out — pick from four — come after, as a lighter follow-up rather
- * than the main event.
+ * typing the word is the harder, more useful skill. The pick-from-four drills —
+ * fragment cloze (the word in a masked phrase), synonym match, and odd-one-out —
+ * come after, as a lighter follow-up rather than the main event.
  */
 export function buildDrillsForWord(word: SavedWord, pool: SavedWord[]): Drill[] {
   const drills: Array<Drill | undefined> = [
     buildDefinitionMatch(word),
     buildFillBlank(word),
+    buildFragmentCloze(word, pool),
     buildSynonymMatch(word, pool),
     buildOddOneOut(word, pool),
   ]
@@ -223,6 +301,67 @@ export function buildPracticeQueue(words: SavedWord[]): PracticeCard[] {
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Common, concrete words used as multiple-choice distractors when the library
+ * is too small to supply them. Deliberately plain nouns unlikely to be a
+ * synonym of saved vocabulary, so one can never become an accidental second
+ * right answer. As the library grows, real saved words are preferred over these.
+ */
+const COMMON_WORDS: readonly string[] = [
+  'table', 'river', 'window', 'garden', 'letter', 'morning', 'engine', 'market', 'picture', 'bottle',
+  'pencil', 'jacket', 'mountain', 'kitchen', 'bicycle', 'camera', 'blanket', 'ladder', 'harbor', 'orchard',
+  'candle', 'saddle', 'wagon', 'kettle', 'meadow', 'lantern', 'cabinet', 'anchor', 'pebble', 'ribbon',
+  'drawer', 'cottage', 'pillow', 'basket', 'compass', 'feather', 'teapot', 'satchel', 'gravel', 'thicket',
+  'saucer', 'doorway', 'chimney', 'curtain', 'pavement', 'notebook', 'railing', 'pantry', 'trolley', 'hillside',
+]
+
+/**
+ * Wrong-answer terms for a multiple-choice drill, drawn in preference order and
+ * deduped case-insensitively: (antonyms →) other saved words → the common-word
+ * list. Never a synonym or related term of the word — either could be a second
+ * correct answer. The common-word tail guarantees three distractors are
+ * reachable even with a single saved word.
+ */
+function pickDistractors(
+  word: SavedWord,
+  pool: SavedWord[],
+  count: number,
+  options: { includeAntonyms: boolean },
+): string[] {
+  // Seeded with everything a distractor must not be; grows as picks are taken,
+  // so it also dedupes across tiers.
+  const blocked = new Set<string>([
+    word.word.toLowerCase(),
+    ...word.synonyms.map((term) => term.toLowerCase()),
+    ...word.related.map((term) => term.toLowerCase()),
+  ])
+
+  const savedTerms = pool
+    .filter((candidate) => candidate.id !== word.id)
+    .map((candidate) => candidate.word)
+
+  const tiers: string[][] = [
+    ...(options.includeAntonyms ? [shuffle(word.antonyms)] : []),
+    shuffle(savedTerms),
+    shuffle([...COMMON_WORDS]),
+  ]
+
+  const distractors: string[] = []
+  for (const tier of tiers) {
+    for (const term of tier) {
+      const trimmed = term.trim()
+      if (!trimmed) continue
+      const lower = trimmed.toLowerCase()
+      if (blocked.has(lower)) continue
+      blocked.add(lower)
+      distractors.push(trimmed)
+      if (distractors.length === count) return distractors
+    }
+  }
+
+  return distractors
 }
 
 /** Whole-word, case-insensitive test for a term inside a definition. */

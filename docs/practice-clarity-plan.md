@@ -193,7 +193,12 @@ accepted**:
 1. Only four drill types exist, and two are hard-gated on scarce data.
 2. Synonym-match is blocked below 4 saved words.
 
-### Solution — recover what's missing (design; not built yet)
+### Solution — recover what's missing (SHIPPED)
+
+Both parts below are now implemented (`puzzles.ts` + new `FragmentClozeCard.tsx`):
+synonym-match works from the first saved word, and fragment-only words gain a
+cloze drill. Verified with the real builder against fragment-only words
+(bespoke, gaudy) and a full-data word (obfuscate → up to five drills).
 
 **A. Synonym-match without the 4-word floor.** Stop sourcing wrong answers
 only from other saved words. Fill the three distractor slots from, in order:

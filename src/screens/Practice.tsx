@@ -6,6 +6,7 @@ import { buildPracticeQueue, type PracticeCard } from '../domain/puzzles'
 import { nextFSRSState, type UsageGrade } from '../domain/scheduler'
 import { DefinitionMatchCard } from '../components/practice/DefinitionMatchCard'
 import { FillBlankCard } from '../components/practice/FillBlankCard'
+import { FragmentClozeCard } from '../components/practice/FragmentClozeCard'
 import { SynonymMatchCard } from '../components/practice/SynonymMatchCard'
 import { OddOneOutCard } from '../components/practice/OddOneOutCard'
 import { UsagePromptCard } from '../components/practice/UsagePromptCard'
@@ -284,6 +285,8 @@ function DrillCardView({
       return <DefinitionMatchCard drill={card.drill} answered={answered} onAnswer={onAnswer} />
     case 'fill-blank':
       return <FillBlankCard drill={card.drill} answered={answered} onAnswer={onAnswer} />
+    case 'fragment-cloze':
+      return <FragmentClozeCard drill={card.drill} answered={answered} onAnswer={onAnswer} />
     case 'synonym-match':
       return <SynonymMatchCard drill={card.drill} answered={answered} onAnswer={onAnswer} />
     case 'odd-one-out':
