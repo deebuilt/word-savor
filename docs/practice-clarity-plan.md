@@ -1,8 +1,10 @@
 # Practice clarity — tweaks plan
 
-Status: planning only. No code changed yet. This documents issues found while
-testing practice after the Merriam-Webster switch, and how to fix them, so the
-work can be picked up in a fresh session.
+Status: #1–#5 implemented and shipped. #6–#7 deferred (polish, not integrity).
+Testing surfaced a bigger question — why sessions feel thin — which is captured
+in the "Update" section at the end, framed as *recovering what's missing*, not
+accepting it. This documents issues found while testing practice after the
+Merriam-Webster switch, and how to fix them.
 
 ## Guiding principle
 
@@ -137,3 +139,81 @@ instead, or the pronunciation/etymology, to add something rather than repeat.
 2. #2 (distinct prompts) and #3 (name the relationship) — clarity.
 3. #1 (counter) — needs a small change to how steps are built.
 4. #6, #7 — polish.
+
+---
+
+## Update — 2026-09-17: shipped, and the richer-sessions plan
+
+### What shipped (#1–#5)
+
+Implemented and pushed. In `puzzles.ts`, `Practice.tsx`, and the three card
+components:
+
+- **#1 counter** — head now shows `Word X of Y` plus a per-word
+  `Question N of M`. The usage check-in shows no question line (it isn't a
+  question).
+- **#2 prompt** — synonym-match eyebrow is now "Which of these is a synonym?"
+  so it no longer impersonates the type-the-word drill.
+- **#3 relationship** — synonym-match answer names it: "'accede' is a synonym
+  of 'acquiesce.'"; the reference block is labeled "Synonyms".
+- **#4 odd-one-out** — the answer strip now leads with the **related** terms
+  the drill actually drew from (labeled "Related to …"), so no belonging option
+  goes missing; synonyms follow as a separate labeled block.
+- **#5 circular synonym** — `buildSynonymMatch` skips any synonym that appears
+  in the definition (whole-word, case-insensitive) and skips the drill if none
+  qualify.
+
+#6 (related-word quality) and #7 (definition-match repeats itself) remain
+untouched — polish, not integrity.
+
+### What testing taught us: how many drills a word gets
+
+Drills are built **per word, independently**. A word gets exactly the drills
+its own data supports. There is **no rule that words match**, and one word
+never suppresses another's drill — fill-blank shows for *any* word that has a
+real sentence, regardless of its neighbors.
+
+| Drill | Appears when |
+| --- | --- |
+| definition-match (type the word) | always (needs a definition) |
+| fill-blank | the word has a real **sentence** (capitalized, ends in `.?!`, 4+ words, contains the word) |
+| synonym-match | the word has a synonym **and** the library has 4+ words (distractors come from other saved words) |
+| odd-one-out | the word has **3+ related** terms + another word supplies an impostor |
+
+Merriam-Webster gives most everyday vocabulary short usage **fragments**
+("a bespoke suit", "gaudy costumes"), not sentences — so fill-blank rarely
+fires. Words that *do* carry a real sentence (e.g. **obfuscate**) still get it;
+nothing was lost in the switch or in these fixes.
+
+### The real problem to solve: sessions feel thin
+
+Not a regression — a design limit. Two causes, both to be **fixed, not
+accepted**:
+
+1. Only four drill types exist, and two are hard-gated on scarce data.
+2. Synonym-match is blocked below 4 saved words.
+
+### Solution — recover what's missing (design; not built yet)
+
+**A. Synonym-match without the 4-word floor.** Stop sourcing wrong answers
+only from other saved words. Fill the three distractor slots from, in order:
+the word's own **antonyms** → other saved words → a small **bundled
+common-word list**. Guarantees three fair distractors at any library size, from
+word #1. Never use this word's own synonyms/related as a distractor (avoids a
+second correct answer).
+
+**B. New drill — "fill in the blank (choose)", a fragment cloze.** Reuse the
+usage **fragments** that the typed sentence fill-blank rejects. Mask the word
+in a fragment ("a \_\_\_ suit") and offer it among three other saved words.
+Because it's a *pick*, not a type, a short fragment is fair — the sentence
+shape can't hand over the answer. Known caveat: fragments can be loosely
+interchangeable ("a \_\_\_ suit" fits *bespoke* or *gaudy*); mitigate by
+preferring distractors that don't also fit, and accept mild ambiguity as still
+educational. This gives fragment-only words (bespoke, gaudy, optimistic,
+proviso) a fourth exercise.
+
+**Not doing:** loosening the *typed* sentence fill-blank to accept fragments —
+that turns it into a giveaway. The fragments get their own fair drill instead.
+
+More drill **variety** is the durable cure for thin sessions. Progress /
+streaks / history is tracked separately in `practice-progress-plan.md`.
