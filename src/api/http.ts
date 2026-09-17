@@ -76,19 +76,20 @@ function warn(source: string, reason: string): void {
 }
 
 /**
- * Timeouts, per source, set from measured behaviour rather than guessed.
+ * Timeouts, per source.
  *
- * dictionaryapi.dev is the outlier: every observed call took roughly twenty
- * seconds even when it succeeded. It is the only source of audio and nothing
- * else depends on it, so it gets a short leash and is allowed to lose.
+ * The Merriam-Webster calls go through the app's own proxy, which edge-caches
+ * responses — so a repeat lookup is fast and even a cold one is a single hop to
+ * a reliable origin. The dictionary call is the required one and gets the
+ * longest leash; the thesaurus is optional and gets less.
  */
 export const TIMEOUT = {
-  /** The definition source. A save cannot complete without it. */
+  /** Merriam-Webster definitions, audio, etymology. A save needs this. */
   dictionary: 12_000,
-  /** Associations and rarity. Fast and reliable in practice. */
+  /** Merriam-Webster synonyms and antonyms. Optional. */
+  thesaurus: 8_000,
+  /** Datamuse associations and rarity. Fast and reliable in practice. */
   datamuse: 8_000,
-  /** Audio only. Deliberately short — see above. */
-  audio: 4_000,
 } as const
 
 /** Lowercased and trimmed: the canonical key form, matching `SavedWord.id`. */

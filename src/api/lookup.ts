@@ -1,27 +1,30 @@
 import type { CachedLookup, SavedWord, Sense } from '../types/domain'
 import { getCachedLookup, putCachedLookup } from '../storage/db'
-import { lookupAudio } from './audio'
 import { lookupDatamuse } from './datamuse'
-import { lookupDictionary, parseDictionary, type WireResponse } from './freedictionary'
+import {
+  lookupMerriamDictionary,
+  lookupMerriamThesaurus,
+  parseMerriamDictionary,
+  parseMerriamThesaurus,
+  type MerriamThesaurusResult,
+} from './merriam'
 import { normaliseWord } from './http'
 
 /**
  * One word, one lookup, three sources merged.
  *
- * The layering the build plan describes: definitions from FreeDictionaryAPI,
- * associations and rarity from Datamuse, audio from dictionaryapi.dev. What is
- * not in the plan, and matters more than the merge itself, is that the three
- * are **not equal partners**:
+ * The sources are **not equal partners**:
  *
- * - FreeDictionaryAPI is **required**. No definition, no word.
- * - Datamuse is **preferred**. Its absence costs the constellation and the
+ * - Merriam-Webster's Collegiate Dictionary is **required**. It supplies the
+ *   definitions, part of speech, pronunciation, spoken audio, and etymology.
+ *   No definition, no word.
+ * - Merriam-Webster's Collegiate Thesaurus is **preferred**. It supplies
+ *   synonyms and antonyms; its absence just leaves those lists to Datamuse.
+ * - Datamuse is **preferred**. It supplies the association constellation and the
  *   rarity sort, both of which a later re-fetch can fill in.
- * - dictionaryapi.dev is **optional and non-blocking**. It gets four seconds
- *   and is allowed to lose.
  *
  * All three are issued at once, so the wait is the slowest source rather than
- * the sum of them — and since the slow one cannot block the result, the wait a
- * reader actually feels is the dictionary call.
+ * the sum of them.
  */
 
 /** A merged, not-yet-saved word. The Look Up screen renders this. */
@@ -83,36 +86,36 @@ export async function lookupWord(rawWord: string): Promise<LookupResult> {
   const cached = await readFromCache(id)
   if (cached) return cached
 
-  const [dictionary, datamuse, audioUrl] = await Promise.all([
-    lookupDictionary(id),
+  const [dictionary, thesaurus, datamuse] = await Promise.all([
+    lookupMerriamDictionary(id),
+    lookupMerriamThesaurus(id),
     lookupDatamuse(id),
-    lookupAudio(id),
   ])
 
   /*
    * A null dictionary result means one of two things and they need different
-   * messages. `parseDictionary` returns null for an empty `entries` array —
-   * the API's way of saying the word is unknown — and `fetchJson` returns null
-   * for a network failure. Distinguished here by whether the other sources got
-   * through: if Datamuse answered, the network is fine and the word is simply
-   * not in the dictionary.
+   * messages. `parseMerriamDictionary` returns null for MW's miss shapes — an
+   * empty array or a suggestion list — and `fetchJson` returns null for a
+   * network failure. Distinguished here by whether the other sources got
+   * through: if either answered, the network is fine and the word is simply not
+   * in the dictionary.
    */
   if (!dictionary) {
-    if (datamuse || audioUrl) throw new WordNotFoundError(id)
+    if (thesaurus || datamuse) throw new WordNotFoundError(id)
     throw new LookupOfflineError(id)
   }
 
-  await writeToCache(id, dictionary.raw, datamuse?.raw, audioUrl)
+  await writeToCache(id, dictionary.raw, thesaurus?.raw, datamuse?.raw)
 
   return {
     id,
     word: dictionary.word,
     senses: dictionary.senses,
-    synonyms: mergeTerms(dictionary.synonyms, datamuse?.synonyms),
-    antonyms: mergeTerms(dictionary.antonyms, datamuse?.antonyms),
+    synonyms: mergeTerms(thesaurus?.synonyms ?? [], datamuse?.synonyms),
+    antonyms: mergeTerms(thesaurus?.antonyms ?? [], datamuse?.antonyms),
     related: datamuse?.related ?? [],
     pronunciation: dictionary.pronunciation,
-    audioUrl,
+    audioUrl: dictionary.audioUrl,
     etymology: dictionary.etymology,
     rarity: datamuse?.rarity,
     cached: false,
@@ -125,23 +128,19 @@ export async function lookupWord(rawWord: string): Promise<LookupResult> {
  * Cache keys.
  *
  * `${source}:${word}` as the domain type specifies. Sources are cached
- * separately so a word that saved without Datamuse can have its associations
- * filled in later without discarding a good dictionary payload.
+ * separately so a word that saved without the thesaurus or Datamuse can have
+ * those filled in later without discarding a good dictionary payload.
  */
 function cacheKey(source: CachedLookup['source'], word: string): string {
   return `${source}:${word}`
 }
 
-/** The shape of the auxiliary payloads, as stored. */
+/** The shape of the auxiliary Datamuse payload, as stored. */
 interface DatamuseCachePayload {
   associations: unknown
   frequency: number | undefined
   synonyms?: unknown
   antonyms?: unknown
-}
-
-interface AudioCachePayload {
-  audioUrl: string | undefined
 }
 
 /**
@@ -153,29 +152,36 @@ interface AudioCachePayload {
  * word from cache with no network at all.
  */
 async function readFromCache(word: string): Promise<LookupResult | null> {
-  const dictionaryEntry = await getCachedLookup(cacheKey('freedictionary', word))
+  const dictionaryEntry = await getCachedLookup(cacheKey('merriam-dictionary', word))
   if (!dictionaryEntry) return null
 
-  const dictionary = parseDictionary(dictionaryEntry.payload as WireResponse, word)
+  const dictionary = parseMerriamDictionary(dictionaryEntry.payload as Parameters<
+    typeof parseMerriamDictionary
+  >[0], word)
   if (!dictionary) return null
 
-  const [datamuseEntry, audioEntry] = await Promise.all([
+  const [thesaurusEntry, datamuseEntry] = await Promise.all([
+    getCachedLookup(cacheKey('merriam-thesaurus', word)),
     getCachedLookup(cacheKey('datamuse', word)),
-    getCachedLookup(cacheKey('dictionaryapi', word)),
   ])
 
+  const thesaurus: MerriamThesaurusResult | null = thesaurusEntry
+    ? parseMerriamThesaurus(
+        thesaurusEntry.payload as Parameters<typeof parseMerriamThesaurus>[0],
+        word,
+      )
+    : null
   const datamuse = datamuseEntry?.payload as DatamuseCachePayload | undefined
-  const audio = audioEntry?.payload as AudioCachePayload | undefined
 
   return {
     id: word,
     word: dictionary.word,
     senses: dictionary.senses,
-    synonyms: mergeTerms(dictionary.synonyms, readCachedTerms(datamuse?.synonyms)),
-    antonyms: mergeTerms(dictionary.antonyms, readCachedTerms(datamuse?.antonyms)),
+    synonyms: mergeTerms(thesaurus?.synonyms ?? [], readCachedTerms(datamuse?.synonyms)),
+    antonyms: mergeTerms(thesaurus?.antonyms ?? [], readCachedTerms(datamuse?.antonyms)),
     related: readCachedRelated(datamuse),
     pronunciation: dictionary.pronunciation,
-    audioUrl: audio?.audioUrl,
+    audioUrl: dictionary.audioUrl,
     etymology: dictionary.etymology,
     rarity: datamuse?.frequency,
     cached: true,
@@ -206,12 +212,11 @@ function readCachedTerms(payload: unknown): string[] {
 }
 
 /**
- * Combine FreeDictionary's terms with Datamuse's, deduplicated.
+ * Combine Merriam-Webster's terms with Datamuse's, deduplicated.
  *
- * FreeDictionary leads — it is the required source and already ordered by
- * Wiktionary's own prominence — and Datamuse's WordNet terms fill in behind it,
- * capped at the same total either source alone would carry. A term both
- * sources agree on is not repeated.
+ * MW leads — it is the curated source — and Datamuse's WordNet terms fill in
+ * behind it, capped at the same total either source alone would carry. A term
+ * both sources agree on is not repeated.
  */
 function mergeTerms(primary: string[], secondary: string[] | undefined): string[] {
   if (!secondary || secondary.length === 0) return primary
@@ -239,19 +244,31 @@ function mergeTerms(primary: string[], secondary: string[] | undefined): string[
 async function writeToCache(
   word: string,
   dictionaryRaw: unknown,
+  thesaurusRaw: unknown,
   datamuseRaw: unknown,
-  audioUrl: string | undefined,
 ): Promise<void> {
   const fetchedAt = Date.now()
   const writes: Promise<void>[] = [
     putCachedLookup({
-      key: cacheKey('freedictionary', word),
-      source: 'freedictionary',
+      key: cacheKey('merriam-dictionary', word),
+      source: 'merriam-dictionary',
       word,
       fetchedAt,
       payload: dictionaryRaw,
     }),
   ]
+
+  if (thesaurusRaw) {
+    writes.push(
+      putCachedLookup({
+        key: cacheKey('merriam-thesaurus', word),
+        source: 'merriam-thesaurus',
+        word,
+        fetchedAt,
+        payload: thesaurusRaw,
+      }),
+    )
+  }
 
   if (datamuseRaw) {
     writes.push(
@@ -261,18 +278,6 @@ async function writeToCache(
         word,
         fetchedAt,
         payload: datamuseRaw,
-      }),
-    )
-  }
-
-  if (audioUrl) {
-    writes.push(
-      putCachedLookup({
-        key: cacheKey('dictionaryapi', word),
-        source: 'dictionaryapi',
-        word,
-        fetchedAt,
-        payload: { audioUrl } satisfies AudioCachePayload,
       }),
     )
   }

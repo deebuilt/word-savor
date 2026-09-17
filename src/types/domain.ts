@@ -55,12 +55,12 @@ export interface SavedWord {
 
   /* Dictionary payload -------------------------------------------------- */
 
-  /** IPA, when the source has it. */
+  /** Pronunciation respelling, when the source has it. */
   pronunciation?: string
-  /** Spoken pronunciation, from dictionaryapi.dev's phonetics. */
+  /** Spoken pronunciation, from Merriam-Webster's audio. */
   audioUrl?: string
   senses: Sense[]
-  /** FreeDictionary's Wiktionary terms, extended with Datamuse `rel_syn`/`rel_ant`. */
+  /** Merriam-Webster thesaurus terms, extended with Datamuse `rel_syn`/`rel_ant`. */
   synonyms: string[]
   antonyms: string[]
   etymology?: string
@@ -169,7 +169,7 @@ export interface Usage {
  */
 export interface CachedLookup {
   key: string
-  source: 'freedictionary' | 'dictionaryapi' | 'datamuse'
+  source: 'merriam-dictionary' | 'merriam-thesaurus' | 'datamuse'
   word: string
   fetchedAt: number
   payload: unknown

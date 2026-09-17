@@ -27,3 +27,6 @@ build.log
 # A word library exported for testing is personal data and does not belong in
 # the repo.
 *wordsavor-backup*.json
+
+# Local env (proxy base for dev). Never commit real values.
+.env
