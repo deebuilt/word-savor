@@ -142,6 +142,12 @@ export default defineConfig({
         // database at save time, not by the worker — a saved word must survive
         // a cache eviction.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Keep the service worker's app-shell navigation fallback off the API.
+        // The worker answers navigations with index.html so the app opens
+        // offline — but the Merriam-Webster proxy lives at `/api/*` on this same
+        // origin, and a request there must reach the function, never the shell.
+        // Without this, opening or fetching an `/api` URL is served the app.
+        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
     // Last, so `dist/index.html` is final before it is copied.
