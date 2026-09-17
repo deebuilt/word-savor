@@ -1,4 +1,4 @@
-import type { Sense } from '../types/domain'
+import type { PartOfSpeechTerms, Sense } from '../types/domain'
 import { fetchJson, normaliseWord, TIMEOUT } from './http'
 
 /**
@@ -129,6 +129,16 @@ type WireThesaurusResponse = WireThesaurusEntry[] | string[]
 export interface MerriamThesaurusResult {
   synonyms: string[]
   antonyms: string[]
+  /**
+   * The same terms, kept grouped by part of speech instead of flattened.
+   *
+   * This is the grouping the flat lists above throw away, and losing it is what
+   * let synonym-match pair a *verb* definition ("to throw violently, hurl") with
+   * an *adjective* synonym ("cursory"). Both lists are returned: the flat one
+   * because five screens already read it, the grouped one because the drill
+   * needs to know which sense a synonym belongs to.
+   */
+  byPartOfSpeech: PartOfSpeechTerms[]
   raw: unknown
 }
 
@@ -366,8 +376,18 @@ export async function lookupMerriamThesaurus(
 /**
  * Synonyms and antonyms out of a Collegiate Thesaurus payload.
  *
- * MW pre-aggregates these on each entry as `meta.syns` / `meta.ants` — grouped
- * by sense, which is flattened here into two ordered, de-duplicated lists.
+ * MW pre-aggregates these on each entry as `meta.syns` / `meta.ants`, grouped by
+ * sense, on an entry that carries its own part of speech in `fl`. Both shapes
+ * are returned: the flat lists every screen already reads, and `byPartOfSpeech`,
+ * which keeps the grouping so a drill can tell a verb's synonyms from an
+ * adjective's. A word like "precipitate" has both, and they are not
+ * interchangeable — "cursory" belongs to the adjective and is nonsense against
+ * the verb's "to throw violently, hurl".
+ *
+ * Entries sharing a part of speech are merged into one group: MW returns
+ * several adjective entries for a polysemous word, and at this level of
+ * alignment they are one bucket.
+ *
  * Same miss handling as the dictionary: a string array or an empty array is a
  * miss, and a miss is null.
  */
@@ -385,16 +405,43 @@ export function parseMerriamThesaurus(
 
   const synonyms = new Set<string>()
   const antonyms = new Set<string>()
+  /* Insertion-ordered, so parts of speech keep the order MW returned them. */
+  const grouped = new Map<string, { synonyms: Set<string>; antonyms: Set<string> }>()
+
   for (const entry of entries) {
-    for (const group of entry.meta?.syns ?? []) for (const term of group) addTerm(synonyms, term)
-    for (const group of entry.meta?.ants ?? []) for (const term of group) addTerm(antonyms, term)
+    const partOfSpeech = entry.fl?.trim() || 'other'
+    let bucket = grouped.get(partOfSpeech)
+    if (!bucket) {
+      bucket = { synonyms: new Set<string>(), antonyms: new Set<string>() }
+      grouped.set(partOfSpeech, bucket)
+    }
+
+    for (const group of entry.meta?.syns ?? [])
+      for (const term of group) {
+        addTerm(synonyms, term)
+        addTerm(bucket.synonyms, term)
+      }
+    for (const group of entry.meta?.ants ?? [])
+      for (const term of group) {
+        addTerm(antonyms, term)
+        addTerm(bucket.antonyms, term)
+      }
   }
 
   if (synonyms.size === 0 && antonyms.size === 0) return null
 
+  const byPartOfSpeech: PartOfSpeechTerms[] = [...grouped.entries()]
+    .map(([partOfSpeech, terms]) => ({
+      partOfSpeech,
+      synonyms: [...terms.synonyms].slice(0, MAX_SYN_ANT),
+      antonyms: [...terms.antonyms].slice(0, MAX_SYN_ANT),
+    }))
+    .filter((group) => group.synonyms.length > 0 || group.antonyms.length > 0)
+
   return {
     synonyms: [...synonyms].slice(0, MAX_SYN_ANT),
     antonyms: [...antonyms].slice(0, MAX_SYN_ANT),
+    byPartOfSpeech,
     raw: payload,
   }
 }

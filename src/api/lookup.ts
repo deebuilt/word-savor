@@ -1,4 +1,4 @@
-import type { CachedLookup, SavedWord, Sense } from '../types/domain'
+import type { CachedLookup, PartOfSpeechTerms, SavedWord, Sense } from '../types/domain'
 import { getCachedLookup, putCachedLookup } from '../storage/db'
 import { lookupDatamuse } from './datamuse'
 import {
@@ -36,6 +36,15 @@ export interface LookupResult {
   senses: Sense[]
   synonyms: string[]
   antonyms: string[]
+  /**
+   * The thesaurus terms kept grouped by part of speech.
+   *
+   * Merriam-Webster only. Datamuse's terms fill the flat lists above but never
+   * these: Datamuse returns no part of speech, so filing its terms under one
+   * would be inventing the very link this field exists to be trustworthy about.
+   * Empty when the thesaurus had nothing.
+   */
+  synonymsByPartOfSpeech: PartOfSpeechTerms[]
   related: string[]
   pronunciation?: string
   audioUrl?: string
@@ -113,6 +122,7 @@ export async function lookupWord(rawWord: string): Promise<LookupResult> {
     senses: dictionary.senses,
     synonyms: mergeTerms(thesaurus?.synonyms ?? [], datamuse?.synonyms),
     antonyms: mergeTerms(thesaurus?.antonyms ?? [], datamuse?.antonyms),
+    synonymsByPartOfSpeech: thesaurus?.byPartOfSpeech ?? [],
     related: datamuse?.related ?? [],
     pronunciation: dictionary.pronunciation,
     audioUrl: dictionary.audioUrl,
@@ -179,6 +189,7 @@ async function readFromCache(word: string): Promise<LookupResult | null> {
     senses: dictionary.senses,
     synonyms: mergeTerms(thesaurus?.synonyms ?? [], readCachedTerms(datamuse?.synonyms)),
     antonyms: mergeTerms(thesaurus?.antonyms ?? [], readCachedTerms(datamuse?.antonyms)),
+    synonymsByPartOfSpeech: thesaurus?.byPartOfSpeech ?? [],
     related: readCachedRelated(datamuse),
     pronunciation: dictionary.pronunciation,
     audioUrl: dictionary.audioUrl,
@@ -311,6 +322,7 @@ export function toSavedWord(
     senses: result.senses,
     synonyms: result.synonyms,
     antonyms: result.antonyms,
+    synonymsByPartOfSpeech: result.synonymsByPartOfSpeech,
     etymology: result.etymology,
     related: result.related,
     rarity: result.rarity,

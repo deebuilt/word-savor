@@ -22,6 +22,26 @@
   color: var(--ws-ink-faint);
 }
 
+/*
+ * Which sense is being tested, above the definition it belongs to.
+ *
+ * Matches `.partOfSpeech` in SenseList.module.css deliberately: a part of
+ * speech should read the same everywhere it appears, so the reader recognises
+ * it rather than decoding it again on each screen.
+ */
+.partOfSpeech {
+  /* Sits directly above the definition and pairs with it, so the gap below is
+     tight and the breathing room is kept above the pair. The definition's own
+     16px top margin is collapsed away by the negative value. */
+  margin: 16px 0 -10px;
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}
+
 /* Usage check-in --------------------------------------------------------------- */
 
 .prompt {

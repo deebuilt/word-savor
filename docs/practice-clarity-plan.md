@@ -274,3 +274,200 @@ network:
   rewrites only their synonym structure from cache, re-fetching just the gaps.
 - Low risk: additive (flat list retained), re-derivable, reversible. Definitions,
   senses, FSRS, usages, and status are untouched.
+
+---
+
+## Update — 2026-09-17 (later): per-sense synonyms SHIPPED
+
+Built as decided above — the fuller fix, not the "show the word instead" shortcut.
+Typecheck and lint clean. **Not yet verified in the running app by Ruthnie.**
+
+### Verified against real Merriam-Webster data
+
+The MW thesaurus was called directly for three words and the new parser run over
+the actual payloads. *Precipitate* returns **three entries, one per part of
+speech**, which is the bug in plain sight:
+
+| POS | MW's synonyms |
+| --- | --- |
+| adjective | cursory, drive-by, flying, gadarene, hasty, headlong … |
+| noun | aftereffect, aftermath, backwash, consequence, outcome … |
+| verb | pour, rain, storm |
+
+The old flatten produced `synonyms[0] = "cursory"` — the adjective's — and
+offered it against whatever definition was shown, including the verb's. The
+lists share nothing, so the drill had no right answer.
+
+After the fix, running the real builder:
+
+- **precipitate** — verb definition "to throw violently : hurl" → answer
+  **"pour"**, strip shows `pour, rain, storm`. Correct.
+- **bespoke** — adjective "custom-made" → answer **"custom-tailored"**; #5's
+  circularity guard still holds, skipping `custom` and `custom-made`.
+- **acquiesce** — single-POS word, unchanged from before. No regression.
+- **Flat `synonyms[0]` is identical in all three**, so the five screens reading
+  the flat list are untouched.
+
+### What changed
+
+- **`merriam.ts`** — `parseMerriamThesaurus` keeps MW's grouping as
+  `byPartOfSpeech`, merging multiple entries that share a POS. The flat lists
+  are still returned exactly as before.
+- **`domain.ts`** — new `PartOfSpeechTerms`; `SavedWord.synonymsByPartOfSpeech`
+  added **optional**. `undefined` = never parsed, `[]` = parsed and empty. The
+  migration depends on that distinction.
+- **`lookup.ts`** — carries the grouping through both the network and cache
+  paths and into `toSavedWord`. Datamuse terms are deliberately excluded from
+  the grouped lists: Datamuse returns no part of speech, so filing its terms
+  under one would invent the very link this field exists to be trusted on.
+- **`puzzles.ts`** — `pickSensePair` walks senses in dictionary order and picks
+  definition + answer *together* from one POS. `SynonymMatchDrill` gained
+  `partOfSpeech` and `senseSynonyms`.
+- **`SynonymMatchCard.tsx`** — names the part of speech above the definition,
+  and the answer strip lists only that sense's synonyms.
+- **`migrations.ts`** (new) + `main.tsx` — the backfill.
+
+### Two decisions made during the build, beyond the plan
+
+1. **No fallback to the flat list.** A word with no grouping **skips**
+   synonym-match rather than guessing. A skipped drill is honest; a mispaired
+   one is the bug being fixed. This is also what makes the pre-migration state
+   safe — worst case is a temporarily missing drill, never a wrong one.
+2. **The antonym distractor tier is now sense-scoped too.** It read the flat
+   `word.antonyms`, so a verb definition could draw the adjective's opposites
+   ("unhurried" against "to hurl") — unrelated words, testing nothing. It now
+   takes only the matched POS's antonyms. Blocking still uses the **whole** flat
+   synonym list on purpose: any sense's synonym could be argued as a second
+   right answer, so the stricter direction is the safe one.
+
+### Migration — placement changed from the plan
+
+The plan said to do this in the IndexedDB `upgrade` callback. That is the wrong
+place and it was not done there: an upgrade transaction **cannot await a network
+call** without deadlocking, and it holds locks on every store while it runs.
+It is instead a post-open backfill in `src/storage/migrations.ts`, started from
+`main.tsx` (once, outside React, so StrictMode's double-mount cannot run it
+twice) and **not awaited** — the library renders from disk and a backfill should
+never be why the first screen is blank.
+
+No DB version bump was needed: the field is additive and optional, so the
+existing schema holds it without a structural change.
+
+Behaviour: words with a cached thesaurus payload are re-parsed **locally, no
+network**. Words without one are fetched once. Every word is written even when
+the result is empty, so nothing is retried forever, and failure is caught
+per-word so one bad word cannot abort the rest.
+
+### Still open
+
+- **#6 related-word quality** and **#7 definition-match repeats itself** —
+  untouched polish, as before.
+- **Needs Ruthnie's in-app verification** before commit. Worth saving
+  **precipitate** specifically, since it is the word that exposed this.
+- Note for the progress work: it is now safe to record streaks and scores
+  against synonym-match, which was the reason this went first.
+
+---
+
+## Update — 2026-09-17 (third): synonym-match distractors, and the dev proxy
+
+### The dev server could not reach Merriam-Webster at all
+
+Found while testing: every lookup on `npm run dev` failed, and real words came
+back as **"No entry for precipitate"** with spelling suggestions whose alternates
+also failed.
+
+Nothing was wrong with the words. `VITE_MW_PROXY_BASE` pointed at the deployed
+preview, which has **Vercel deployment protection** on, so `/api/mw` answered
+`302` to an SSO login page instead of JSON. The misleading message comes from
+[`lookup.ts`](../src/api/lookup.ts) — if the dictionary fails but Datamuse
+succeeds, it concludes "the network is fine, so this is not a word". Datamuse is
+keyless and public, so it sailed through while MW was walled off.
+
+**Fix:** `merriamDevProxy` in `vite.config.ts` serves `/api/mw` from the dev
+server itself — no deployed origin, no SSO wall, no CORS. Keys are read via
+vite's `loadEnv`, so they stay in the Node process and never reach the browser
+bundle, the same guarantee the real function gives. `apply: 'serve'` only;
+production still uses `api/mw.ts`. `VITE_MW_PROXY_BASE` is now empty.
+
+Verified live: `precipitate` returns 200 with all three parts of speech.
+
+### Synonym-match was asking a recognition question, not a comprehension one
+
+Ruthnie, testing: *"it's giving me one synonym out of three words that are in my
+library… obfuscate, coalesce, epigraph, and pour. Obviously, it's pour. That's a
+bad drill."*
+
+Correct, and worse than it first looks. Drawing distractors from the library
+meant the drill could be passed **without reading the definition** — three
+options are words you have seen before, one is not. That is a familiarity test
+wearing a comprehension test's clothes.
+
+**Library words are no longer used as synonym-match distractors at all.** The
+new source order, best first:
+
+1. **Related terms** (`word.related`), *only for polysemous words* — see below
+2. **Other senses' synonyms** — tests whether the reader noticed which sense is on trial
+3. **This sense's antonyms**
+4. **Common words** — the floor
+
+`buildSynonymMatch` no longer takes `pool`. Fragment-cloze keeps using library
+words via `pickClozeDistractors`: there the blank wants a real word and there is
+no definition to reason against, so an unfamiliar option gives nothing away.
+
+### Two traps found by testing the real output, both fixed
+
+Testing three real words caught distractors that were not wrong answers at all:
+
+- *Obfuscate* is defined "to throw into shadow : **darken**" — and `darken`
+  arrived from Datamuse as a distractor, **printed in the prompt** and marked
+  wrong beneath it. Now: no term appearing in the definition can be a distractor.
+- *Coalesce* ("to grow together") offered `merge` and `conflate` as wrong beside
+  `associate` as right. Both are better answers than the one being scored. Now:
+  the block list covers the word's **whole** synonym list, every sense, not just
+  the tested sense's.
+
+### Why related terms are gated on polysemy
+
+Datamuse `ml=` returns *means-like* terms. For a word with one tight meaning,
+"means-like" and "synonym" are the same set, so the tier produces defensible
+wrong answers (`obscure`, `confound` against *obfuscate*). No filter separates
+those — the difference is not in the data. MW simply did not list them, and
+absence from a thesaurus is not evidence of a different meaning.
+
+Where a word spans parts of speech, the related list spans them too, and a term
+from another sense is a genuine wrong answer. So the tier is spent only when
+`synonymsByPartOfSpeech.length > 1`; single-sense words fall through to their
+antonyms and then common words — an easier question, but an answerable one.
+
+Verified output:
+
+| word | options | answer |
+| --- | --- | --- |
+| precipitate (verb) | pour, hasten, precipitant, come down | pour |
+| obfuscate | clarify, illuminate, clear (up), becloud | becloud |
+| coalesce | sever, associate, section, dissever | associate |
+
+40-run check confirms no library word is ever used as a distractor.
+
+### Prompt fix
+
+"Which of these is a synonym?" asked for a synonym *of a definition*, which is
+not a relationship words have. It now names the word — **"Which of these is a
+synonym of precipitate?"** — with the part of speech and definition below it.
+
+### Known quirk, deliberately kept: archaic citations in fill-blank
+
+Testing turned up a fill-blank built from a **1531 Thomas Elyot** citation —
+"Also the vertues beynge in a cruell persone be nat only \_\_\_ or hyd…" — for
+*obfuscate*. It is not a bug in the drill: MW marks that sense **obsolete**, and
+a dead sense's only citation is naturally five centuries old. Modern senses get
+modern examples.
+
+[`isFullSentence`](../src/domain/puzzles.ts) would pass any such citation —
+capitalised, terminally punctuated, 4+ words is all it checks. **Ruthnie's call
+was to keep it** ("it's just weird", not harmful), so no filter was added. Worth
+remembering if archaic examples ever become common enough to annoy: the fix
+would be to skip senses MW labels obsolete, not to pattern-match the spelling.
+
+### Still needs Ruthnie's in-app verification before commit.

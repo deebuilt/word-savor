@@ -44,6 +44,24 @@ export interface Sense {
   examples: string[]
 }
 
+/**
+ * Synonyms and antonyms for one part of speech.
+ *
+ * The thesaurus groups its terms by entry (part of speech) and by sense within
+ * each entry; storing them flat loses that, and a lost grouping is a drill that
+ * can show a *verb* definition and accept an *adjective* synonym. Grouped at
+ * the part-of-speech level rather than per sense on purpose: the dictionary and
+ * the thesaurus are separate responses whose sense numbering does not line up,
+ * but whose parts of speech do. Aligning on what genuinely matches beats
+ * guessing at what doesn't.
+ */
+export interface PartOfSpeechTerms {
+  /** Matched against `Sense.partOfSpeech`, so the labels must come from the same vocabulary. */
+  partOfSpeech: string
+  synonyms: string[]
+  antonyms: string[]
+}
+
 export interface SavedWord {
   /** Lowercased, trimmed. Also the object store key, so a word is saved once. */
   id: string
@@ -63,6 +81,19 @@ export interface SavedWord {
   /** Merriam-Webster thesaurus terms, extended with Datamuse `rel_syn`/`rel_ant`. */
   synonyms: string[]
   antonyms: string[]
+  /**
+   * The Merriam-Webster terms again, grouped by part of speech.
+   *
+   * Additive on purpose — `synonyms` above stays the flat list every screen
+   * already reads, and this sits beside it for the one consumer that needs to
+   * know which sense a synonym belongs to (synonym-match, which otherwise pairs
+   * a verb definition with an adjective synonym).
+   *
+   * Optional because words saved before the grouping existed do not have it.
+   * `undefined` means "never parsed" and an empty array means "parsed, nothing
+   * there" — a distinction the migration depends on to know what it still owes.
+   */
+  synonymsByPartOfSpeech?: PartOfSpeechTerms[]
   etymology?: string
   /**
    * Semantically associated words, from Datamuse `ml=` (means-like).

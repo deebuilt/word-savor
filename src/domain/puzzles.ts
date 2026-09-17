@@ -55,9 +55,19 @@ export interface SynonymMatchDrill {
   kind: 'synonym-match'
   word: SavedWord
   definition: string
+  /** The part of speech both `definition` and `answer` belong to. */
+  partOfSpeech: string
   /** One correct synonym among the options, shuffled in. */
   options: string[]
   answer: string
+  /**
+   * Every synonym for this part of speech — what the answer strip shows.
+   *
+   * Not the word's whole synonym list: under a verb definition, the adjective's
+   * synonyms are not a bonus, they are the same mismatch the drill was fixed to
+   * stop making, printed as a reference.
+   */
+  senseSynonyms: string[]
 }
 
 export interface OddOneOutDrill {
@@ -165,29 +175,86 @@ export function buildFillBlank(word: SavedWord): FillBlankDrill | undefined {
   }
 }
 
-export function buildSynonymMatch(word: SavedWord, pool: SavedWord[]): SynonymMatchDrill | undefined {
-  const definition = word.senses[0]?.definition
-  if (!definition) return undefined
+/** One sense's definition and the terms that belong to it, chosen together. */
+interface SensePair {
+  definition: string
+  partOfSpeech: string
+  answer: string
+  senseSynonyms: string[]
+  /** This part of speech's antonyms — the only ones that test anything here. */
+  senseAntonyms: string[]
+}
 
-  // Skip any synonym that already appears in the definition — "custom" as the
-  // answer to "custom made" gives itself away in the prompt. Whole-word,
-  // case-insensitive; if no synonym survives, skip the drill for this word.
-  const answer = word.synonyms.find((synonym) => !definitionContains(definition, synonym))
-  if (!answer) return undefined
+/**
+ * A definition paired with a synonym that genuinely belongs to it.
+ *
+ * The pairing is the whole drill. Showing "to throw violently, hurl" and
+ * accepting "cursory" is not a hard question, it is a wrong one — those are the
+ * verb and the adjective senses of *precipitate*, and nothing about the first
+ * makes the second correct. So the definition is not chosen first and the
+ * answer fitted to it; both are chosen together, from one part of speech.
+ *
+ * Senses are walked in the dictionary's own order, so the primary sense is
+ * still preferred — it just yields to a later one rather than answering with
+ * another sense's synonym. A word whose grouped terms cover none of its senses
+ * gets no drill at all: an honest omission, where a mismatched pairing would be
+ * a small lie told confidently.
+ */
+function pickSensePair(word: SavedWord): SensePair | undefined {
+  const groups = word.synonymsByPartOfSpeech
+  if (!groups || groups.length === 0) return undefined
 
-  // Distractors fall back through antonyms → other saved words → a common-word
-  // list, so this drill works from the very first saved word instead of being
-  // skipped until the library holds four. Antonyms are included: telling a
-  // synonym from an antonym given the meaning is a fair test.
-  const distractors = pickDistractors(word, pool, 3, { includeAntonyms: true })
+  for (const sense of word.senses) {
+    if (!sense.definition) continue
+    const group = groups.find(
+      (candidate) => candidate.partOfSpeech.toLowerCase() === sense.partOfSpeech.toLowerCase(),
+    )
+    if (!group) continue
+
+    // Skip any synonym that already appears in the definition — "custom" as the
+    // answer to "custom made" gives itself away in the prompt. Whole-word and
+    // case-insensitive.
+    const answer = group.synonyms.find((synonym) => !definitionContains(sense.definition, synonym))
+    if (answer) {
+      return {
+        definition: sense.definition,
+        partOfSpeech: sense.partOfSpeech,
+        answer,
+        senseSynonyms: group.synonyms,
+        senseAntonyms: group.antonyms,
+      }
+    }
+  }
+
+  return undefined
+}
+
+/*
+ * No `pool` parameter, unlike its neighbours: this drill deliberately draws
+ * none of its wrong answers from the rest of the library. See
+ * `pickSynonymDistractors`.
+ */
+export function buildSynonymMatch(word: SavedWord): SynonymMatchDrill | undefined {
+  const pair = pickSensePair(word)
+  if (!pair) return undefined
+
+  const distractors = pickSynonymDistractors(
+    word,
+    3,
+    pair.definition,
+    pair.senseSynonyms,
+    pair.senseAntonyms,
+  )
   if (distractors.length < 3) return undefined
 
   return {
     kind: 'synonym-match',
     word,
-    definition,
-    options: shuffle([answer, ...distractors]),
-    answer,
+    definition: pair.definition,
+    partOfSpeech: pair.partOfSpeech,
+    options: shuffle([pair.answer, ...distractors]),
+    answer: pair.answer,
+    senseSynonyms: pair.senseSynonyms,
   }
 }
 
@@ -211,7 +278,7 @@ export function buildFragmentCloze(word: SavedWord, pool: SavedWord[]): Fragment
   const match = new RegExp(`\\b${escapeRegExp(word.word)}\\b`, 'i').exec(fragment)
   if (!match) return undefined
 
-  const distractors = pickDistractors(word, pool, 3, { includeAntonyms: false })
+  const distractors = pickClozeDistractors(word, pool, 3)
   if (distractors.length < 3) return undefined
 
   return {
@@ -263,7 +330,7 @@ export function buildDrillsForWord(word: SavedWord, pool: SavedWord[]): Drill[] 
     buildDefinitionMatch(word),
     buildFillBlank(word),
     buildFragmentCloze(word, pool),
-    buildSynonymMatch(word, pool),
+    buildSynonymMatch(word),
     buildOddOneOut(word, pool),
   ]
   return drills.filter((drill): drill is Drill => drill !== undefined)
@@ -318,20 +385,112 @@ const COMMON_WORDS: readonly string[] = [
 ]
 
 /**
- * Wrong-answer terms for a multiple-choice drill, drawn in preference order and
- * deduped case-insensitively: (antonyms →) other saved words → the common-word
- * list. Never a synonym or related term of the word — either could be a second
- * correct answer. The common-word tail guarantees three distractors are
- * reachable even with a single saved word.
+ * Wrong answers for **synonym-match**, in descending order of how much they
+ * actually test.
+ *
+ * Other saved words are pointedly *not* a source here. Against "to throw
+ * violently, hurl", a library of obfuscate / coalesce / epigraph does not ask
+ * what *precipitate* means — it asks which option looks unfamiliar. Three words
+ * you have seen before and one you have not is a recognition test wearing a
+ * comprehension test's clothes, and it is passable without reading the
+ * definition at all.
+ *
+ * So the sources, best first:
+ *
+ * 1. **Related terms** (`word.related`) — Datamuse means-like words. Sitting in
+ *    the same meaning-neighbourhood as the word without being synonyms of it,
+ *    which is the precise definition of a wrong answer worth considering.
+ * 2. **Other senses' synonyms** — for *precipitate*'s verb sense, the noun's
+ *    "consequence" and the adjective's "hasty". These test whether the reader
+ *    noticed *which sense* is on trial, which the card now labels. The hardest
+ *    and most educational tier.
+ * 3. **This sense's antonyms** — a fair test against a definition, and the one
+ *    tier where being wrong is the whole point.
+ * 4. **Common words** — the floor, so three distractors are always reachable.
+ *    Plain nouns that can never be an accidental second right answer.
+ *
+ * Note tier 1 deliberately spends terms that `buildOddOneOut` treats as
+ * *correct* answers — there, belonging to the word is the point; here, not
+ * being a synonym is. Same list, two honest readings of it.
  */
-function pickDistractors(
+function pickSynonymDistractors(
   word: SavedWord,
-  pool: SavedWord[],
   count: number,
-  options: { includeAntonyms: boolean },
+  definition: string,
+  senseSynonyms: string[],
+  senseAntonyms: string[],
 ): string[] {
-  // Seeded with everything a distractor must not be; grows as picks are taken,
-  // so it also dedupes across tiers.
+  const senseSynonymSet = new Set(senseSynonyms.map((term) => term.toLowerCase()))
+
+  /*
+   * Two things disqualify a wrong answer, and both are about it being *too
+   * right* rather than too easy:
+   *
+   * - **Any** of the word's synonyms, from any sense — not just this sense's.
+   *   Datamuse's related terms overlap MW's thesaurus heavily, so without this,
+   *   *coalesce* ("to grow together") offered `merge` and `conflate` as wrong
+   *   answers beside `associate` as the right one. Three defensible answers and
+   *   one scored correct is not a question.
+   * - **Any word inside the definition itself.** *Obfuscate* is defined as "to
+   *   throw into shadow : darken", and `darken` arrived from Datamuse as a
+   *   distractor — printed in the prompt and marked wrong underneath it.
+   *
+   * This costs tier 2 most of its material, which is the right trade: the ideal
+   * hard distractor and an unfair one are separated by a line too fine to draw
+   * reliably, and being confusingly wrong is worse than being slightly easy.
+   */
+  const blocked = new Set<string>([
+    word.word.toLowerCase(),
+    ...senseSynonymSet,
+    ...word.synonyms.map((term) => term.toLowerCase()),
+  ])
+
+  const otherSenseSynonyms = (word.synonymsByPartOfSpeech ?? [])
+    .flatMap((group) => group.synonyms)
+    .filter((term) => !senseSynonymSet.has(term.toLowerCase()))
+
+  /*
+   * Related terms are only safe for a word whose meanings genuinely diverge.
+   *
+   * Datamuse `ml=` returns *means-like* terms, and for a word with one tight
+   * meaning "means-like" and "synonym" are the same set — so *obfuscate* ("to
+   * throw into shadow") draws `obscure` and `confound` as wrong answers that
+   * are not wrong. No filter separates those, because the difference is not in
+   * the data: MW simply did not list them, and absence from a thesaurus is not
+   * evidence of a different meaning.
+   *
+   * Where the word has several parts of speech, the related list spans them,
+   * and a term belonging to another sense is a real wrong answer — *hasty* and
+   * *hurry* against *precipitate*'s "to throw violently" are exactly the
+   * confusion worth drilling. So the tier is spent only when the word is
+   * polysemous, and single-sense words fall through to plain common words:
+   * an easier question, but an answerable one.
+   */
+  const isPolysemous = (word.synonymsByPartOfSpeech ?? []).length > 1
+  const relatedTier = isPolysemous ? word.related : []
+
+  const tiers: string[][] = [
+    shuffle(relatedTier),
+    shuffle(otherSenseSynonyms),
+    shuffle(senseAntonyms),
+    shuffle([...COMMON_WORDS]),
+  ].map((tier) => tier.filter((term) => !definitionContains(definition, term)))
+
+  return takeFromTiers(tiers, count, blocked)
+}
+
+/**
+ * Wrong answers for **fragment-cloze**, where the blank wants a real word.
+ *
+ * Saved words are right here and wrong in synonym-match, because the two drills
+ * ask different questions. "A ___ suit" is filled by a word, and the other
+ * words in the library are exactly the pool worth choosing from; there is no
+ * definition to reason against, so an unfamiliar option is not a giveaway.
+ *
+ * Antonyms are not used: an antonym can genuinely fit a collocation ("a plain
+ * suit" beside "a bespoke suit"), so it is not a clean wrong answer.
+ */
+function pickClozeDistractors(word: SavedWord, pool: SavedWord[], count: number): string[] {
   const blocked = new Set<string>([
     word.word.toLowerCase(),
     ...word.synonyms.map((term) => term.toLowerCase()),
@@ -342,12 +501,14 @@ function pickDistractors(
     .filter((candidate) => candidate.id !== word.id)
     .map((candidate) => candidate.word)
 
-  const tiers: string[][] = [
-    ...(options.includeAntonyms ? [shuffle(word.antonyms)] : []),
-    shuffle(savedTerms),
-    shuffle([...COMMON_WORDS]),
-  ]
+  return takeFromTiers([shuffle(savedTerms), shuffle([...COMMON_WORDS])], count, blocked)
+}
 
+/**
+ * Walk tiers in order, taking terms that are not blocked, until `count` is
+ * reached. `blocked` grows as picks are taken, so it dedupes across tiers too.
+ */
+function takeFromTiers(tiers: string[][], count: number, blocked: Set<string>): string[] {
   const distractors: string[] = []
   for (const tier of tiers) {
     for (const term of tier) {

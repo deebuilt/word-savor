@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { copyFileSync, readFileSync } from 'node:fs'
@@ -54,7 +54,86 @@ function spaFallback(): Plugin {
   }
 }
 
-export default defineConfig({
+/**
+ * Serve `/api/mw` locally during `npm run dev`.
+ *
+ * The dev server is a static file server with no functions, so the app used to
+ * reach the *deployed* proxy instead, via `VITE_MW_PROXY_BASE`. That works only
+ * while the deployment is public — and with Vercel's deployment protection on,
+ * every lookup gets a 302 to an SSO login page rather than a dictionary entry.
+ * The app reads the silence as "no such word", so real words come back as
+ * "No entry for precipitate". Nothing in the app is wrong; it simply never
+ * reached Merriam-Webster.
+ *
+ * Serving the proxy here removes the hop entirely: no deployed origin, no SSO
+ * wall, no CORS, and dev keeps working with the deployment private. The keys are
+ * read through vite's `loadEnv` rather than `import.meta.env`, so they stay in
+ * the Node process and never enter the browser bundle — the same guarantee the
+ * real function gives, which is the whole reason a proxy exists.
+ *
+ * Deliberately `apply: 'serve'`. In production the real function at `api/mw.ts`
+ * handles this route, and this plugin does not exist in the build.
+ */
+function merriamDevProxy(mode: string): Plugin {
+  const env = loadEnv(mode, process.cwd(), '')
+  const REFERENCES = {
+    dictionary: {
+      base: 'https://dictionaryapi.com/api/v3/references/collegiate/json',
+      key: env.MW_DICTIONARY_KEY,
+    },
+    thesaurus: {
+      base: 'https://dictionaryapi.com/api/v3/references/thesaurus/json',
+      key: env.MW_THESAURUS_KEY,
+    },
+  }
+
+  return {
+    name: 'wordsavor-merriam-dev-proxy',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/api/mw', (req, res) => {
+        const send = (status: number, body: unknown) => {
+          res.statusCode = status
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.end(JSON.stringify(body))
+        }
+
+        const url = new URL(req.url ?? '', 'http://localhost')
+        const ref = url.searchParams.get('ref')
+        const word = (url.searchParams.get('word') ?? '').trim().toLowerCase()
+
+        if (ref !== 'dictionary' && ref !== 'thesaurus') {
+          return send(400, { error: 'Query `ref` must be "dictionary" or "thesaurus".' })
+        }
+        if (!word) return send(400, { error: 'Query `word` is missing.' })
+
+        const reference = REFERENCES[ref]
+        if (!reference.key) {
+          // Named explicitly: a blank key is a setup problem, and "set
+          // MW_DICTIONARY_KEY in .env" is an answer, where a 500 is a puzzle.
+          return send(500, {
+            error: `Missing ${ref === 'dictionary' ? 'MW_DICTIONARY_KEY' : 'MW_THESAURUS_KEY'} in .env.`,
+          })
+        }
+
+        const target = `${reference.base}/${encodeURIComponent(word)}?key=${encodeURIComponent(reference.key)}`
+        fetch(target, { headers: { Accept: 'application/json' } })
+          .then(async (upstream) => {
+            if (!upstream.ok) {
+              return send(502, { error: `Merriam-Webster returned ${upstream.status}.` })
+            }
+            const body = await upstream.text()
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'application/json; charset=utf-8')
+            res.end(body)
+          })
+          .catch(() => send(502, { error: 'Could not reach Merriam-Webster.' }))
+      })
+    },
+  }
+}
+
+export default defineConfig(({ mode }) => ({
   base: BASE,
   define: {
     __APP_VERSION__: JSON.stringify(APP_VERSION),
@@ -76,6 +155,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    merriamDevProxy(mode),
     VitePWA({
       /*
        * `autoUpdate`, not `prompt`. An update banner cannot say what is in the
@@ -153,4 +233,4 @@ export default defineConfig({
     // Last, so `dist/index.html` is final before it is copied.
     spaFallback(),
   ],
-})
+}))
