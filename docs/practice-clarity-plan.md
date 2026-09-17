@@ -222,3 +222,24 @@ that turns it into a giveaway. The fragments get their own fair drill instead.
 
 More drill **variety** is the durable cure for thin sessions. Progress /
 streaks / history is tracked separately in `practice-progress-plan.md`.
+
+### Known follow-up — synonym-match shows the wrong sense
+
+Found while testing (word: **precipitate**). Synonyms are stored as one flat
+`word.synonyms` list, not grouped by sense or part of speech, but synonym-match
+shows `senses[0].definition`. For a polysemous word the two can disagree: the
+drill showed the *verb* sense "to throw violently, hurl" but the answer was
+"cursory", a synonym of the *adjective* sense "hasty". Reads as wrong because it
+is — cursory is not a synonym of "hurl".
+
+Not introduced by any of the fixes above; it predates them (the MW dictionary
+supplies senses, the MW thesaurus + Datamuse supply one merged synonym list, and
+the sense linkage is lost in the merge).
+
+Fix options:
+1. **Small:** show the **word**, not a single sense's definition — "Which of
+   these is a synonym of *precipitate*?" Any-sense synonym is then fair, and the
+   mismatch disappears. Matches how odd-one-out already reads. Recommended.
+2. **Fuller:** store synonyms per sense / part of speech (MW thesaurus groups
+   them this way) and align the shown definition's part of speech with the
+   answer. Keeps the definition; needs a parse change and a re-lookup/backfill.
