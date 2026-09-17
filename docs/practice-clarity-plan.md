@@ -236,10 +236,41 @@ Not introduced by any of the fixes above; it predates them (the MW dictionary
 supplies senses, the MW thesaurus + Datamuse supply one merged synonym list, and
 the sense linkage is lost in the merge).
 
-Fix options:
+Fix options considered:
 1. **Small:** show the **word**, not a single sense's definition — "Which of
    these is a synonym of *precipitate*?" Any-sense synonym is then fair, and the
-   mismatch disappears. Matches how odd-one-out already reads. Recommended.
+   mismatch disappears. Matches how odd-one-out already reads.
 2. **Fuller:** store synonyms per sense / part of speech (MW thesaurus groups
    them this way) and align the shown definition's part of speech with the
-   answer. Keeps the definition; needs a parse change and a re-lookup/backfill.
+   answer. Keeps the definition.
+
+**Decision — go with the fuller fix (#2).** The whole point of this app is
+reverse recall: read the definition, weigh each candidate word, test it against
+the meaning. Option 1 trades that away for convenience. The fuller fix keeps the
+definition *and* makes the answer honest. **Build it before the progress work**,
+so streaks and scores are never recorded against a known-wrong drill.
+
+**How the fix works.** MW's thesaurus payload already groups synonyms by entry
+(part of speech) and by sense within it (`meta.syns`). Today
+`parseMerriamThesaurus` flattens every group across every entry into one list —
+that flatten is where the sense linkage is lost. Re-parse it to keep the
+grouping, realistically at the **part-of-speech** level: dictionary senses and
+thesaurus entries are separate responses whose per-sense numbering doesn't line
+up, but POS does. Then synonym-match shows a definition of POS X and only
+answers with a synonym from POS X's group. Store it additively (per `Sense`, or
+a POS→synonyms map on the word) and keep the flat `synonyms` for the
+constellations view so nothing else breaks.
+
+**Migration — what happens to words already saved.** Safe, and mostly no
+network:
+- The **raw** MW thesaurus response is already cached per word in the `lookups`
+  store, and the app re-derives fields from those raw payloads with no re-fetch
+  (see `readFromCache` in `src/api/lookup.ts`). A one-time migration re-parses
+  each saved word's cached thesaurus into the new grouped shape — locally,
+  offline, no API calls.
+- Words with **no** cached thesaurus payload (thesaurus didn't answer when they
+  were saved) get re-fetched once. Trivial at a ~12-word library.
+- Mechanism: bump the IndexedDB version; the upgrade walks saved words and
+  rewrites only their synonym structure from cache, re-fetching just the gaps.
+- Low risk: additive (flat list retained), re-derivable, reversible. Definitions,
+  senses, FSRS, usages, and status are untouched.
