@@ -119,8 +119,13 @@ export function buildFillBlank(word: SavedWord): FillBlankDrill | undefined {
 
 export function buildSynonymMatch(word: SavedWord, pool: SavedWord[]): SynonymMatchDrill | undefined {
   const definition = word.senses[0]?.definition
-  const answer = word.synonyms[0]
-  if (!definition || !answer) return undefined
+  if (!definition) return undefined
+
+  // Skip any synonym that already appears in the definition — "custom" as the
+  // answer to "custom made" gives itself away in the prompt. Whole-word,
+  // case-insensitive; if no synonym survives, skip the drill for this word.
+  const answer = word.synonyms.find((synonym) => !definitionContains(definition, synonym))
+  if (!answer) return undefined
 
   // Distractors: other saved words' display forms, never a synonym of this
   // one — Datamuse's associations overlap enough that a second correct answer
@@ -218,6 +223,11 @@ export function buildPracticeQueue(words: SavedWord[]): PracticeCard[] {
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Whole-word, case-insensitive test for a term inside a definition. */
+function definitionContains(definition: string, term: string): boolean {
+  return new RegExp(`\\b${escapeRegExp(term)}\\b`, 'i').test(definition)
 }
 
 function shuffle<T>(items: readonly T[]): T[] {

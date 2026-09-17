@@ -6,16 +6,18 @@ import { TermList } from './TermList'
 import styles from './PracticeCards.module.css'
 
 /**
- * Given the definition, pick which of four words means it.
+ * Given the definition, pick which of four words is a *synonym* of the word it
+ * describes.
  *
- * The lighter follow-up to `DefinitionMatchCard`'s typed recall — same
- * question, recognition instead of production. Comes after the typed version
- * in `buildDrillsForWord`'s order on purpose.
+ * Deliberately not "which word means this?" — that is `DefinitionMatchCard`'s
+ * question, and back to back on the same word an identical prompt reads as the
+ * same question asked twice. This one branches out: recognising an association,
+ * eliminating distractors. Its prompt says so, and its answer names the
+ * relationship ("'accede' is a synonym of 'acquiesce'") so the reader learns
+ * *why* the pick was right.
  *
- * The answer confirms the pick against the word's *full* synonym set, not its
- * definitions — this drill already exercised the synonym relationship, so
- * the follow-up extends that (every synonym saved, not just the one option
- * that was right) rather than repeating content from a different drill.
+ * The answer confirms the pick against the word's *full* synonym set — every
+ * synonym saved, not just the one option that was right.
  */
 
 interface SynonymMatchCardProps {
@@ -33,7 +35,7 @@ export function SynonymMatchCard({ drill, answered, onAnswer }: SynonymMatchCard
 
   return (
     <div className={styles.card}>
-      <span className={styles.eyebrow}>Which word means this?</span>
+      <span className={styles.eyebrow}>Which of these is a synonym?</span>
       <p className={styles.definitionLarge}>{drill.definition}</p>
 
       <div className={styles.options}>
@@ -61,8 +63,17 @@ export function SynonymMatchCard({ drill, answered, onAnswer }: SynonymMatchCard
       {settled !== undefined && (
         <DrillAnswer
           correct={settled}
-          statement={settled ? 'Right.' : `The word is “${drill.word.word}.”`}
-          reference={<TermList terms={drill.word.synonyms} />}
+          statement={
+            settled
+              ? `“${drill.answer}” is a synonym of “${drill.word.word}.”`
+              : `Not quite — “${drill.answer}” is a synonym of “${drill.word.word}.”`
+          }
+          reference={
+            <>
+              <p className={styles.referenceLabel}>Synonyms</p>
+              <TermList terms={drill.word.synonyms} />
+            </>
+          }
           onNext={() => onAnswer(settled)}
         />
       )}

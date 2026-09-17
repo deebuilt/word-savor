@@ -11,10 +11,11 @@ import styles from './PracticeCards.module.css'
  * associations has stuck, which is a different kind of knowing than
  * defining it.
  *
- * The answer shows synonyms, not definitions — repeating the definition
- * after a drill that never mentioned it reads as a non sequitur. This drill
- * already exercised one layer of the word's web (related terms); synonyms is
- * the next layer, not a rehash of the same one.
+ * The answer strip leads with the *related* terms this drill actually drew
+ * its options from — so every belonging option is present in the reveal.
+ * Showing synonyms here instead (a different list) dropped correct options
+ * from view and made a working drill look broken. Synonyms still follow, as a
+ * separate labeled layer of the word's web, not a rehash of the definition.
  */
 
 interface OddOneOutCardProps {
@@ -29,6 +30,10 @@ export function OddOneOutCard({ drill, answered, onAnswer }: OddOneOutCardProps)
 
   const settled = answered ?? (picked !== undefined ? picked === drill.impostor : undefined)
   const showOptionState = answered !== undefined || picked !== undefined
+
+  // The terms the drill drew from — every option except the impostor. Shown in
+  // the answer so the belonging options are all accounted for.
+  const relatedShown = drill.options.filter((option) => option !== drill.impostor)
 
   return (
     <div className={styles.card}>
@@ -67,12 +72,20 @@ export function OddOneOutCard({ drill, answered, onAnswer }: OddOneOutCardProps)
               : `“${drill.impostor}” was the odd one out.`
           }
           reference={
-            drill.word.synonyms.length > 0 ? (
-              <>
-                <p className={styles.referenceLabel}>Synonyms</p>
-                <TermList terms={drill.word.synonyms} />
-              </>
-            ) : undefined
+            <div className={styles.referenceGroups}>
+              <div>
+                <p className={styles.referenceLabel}>
+                  Related to “{drill.word.word}”
+                </p>
+                <TermList terms={relatedShown} />
+              </div>
+              {drill.word.synonyms.length > 0 && (
+                <div>
+                  <p className={styles.referenceLabel}>Synonyms</p>
+                  <TermList terms={drill.word.synonyms} />
+                </div>
+              )}
+            </div>
           }
           onNext={() => onAnswer(settled)}
         />

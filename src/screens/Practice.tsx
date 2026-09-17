@@ -42,7 +42,14 @@ interface PracticeProps {
 }
 
 type Step = (
-  | { kind: 'drill'; card: PracticeCard }
+  | {
+      kind: 'drill'
+      card: PracticeCard
+      /** 0-based position of this drill among its word's drills (the check-in is not counted). */
+      drillIndex: number
+      /** How many drills this word has — the denominator for "Question N of M". */
+      drillCount: number
+    }
   | { kind: 'check-in'; word: SavedWord }
 ) & {
   /** 0-based position of this step's word within the session — the same for every step of that word. */
@@ -70,13 +77,24 @@ export function Practice({ onProgress }: PracticeProps) {
       return
     }
 
+    // Each word's drills are consecutive, so a per-word count is a single pass:
+    // it's the denominator for the "Question N of M" line in the head.
+    const drillCountByWord = new Map<string, number>()
+    for (const card of cards) {
+      drillCountByWord.set(card.word.id, (drillCountByWord.get(card.word.id) ?? 0) + 1)
+    }
+
     const steps: Step[] = []
     let wordIndex = 0
+    let drillIndex = 0
     for (const card of cards) {
-      steps.push({ kind: 'drill', card, wordIndex })
+      const drillCount = drillCountByWord.get(card.word.id) ?? 1
+      steps.push({ kind: 'drill', card, wordIndex, drillIndex, drillCount })
+      drillIndex++
       if (card.isLastForWord) {
         steps.push({ kind: 'check-in', word: card.word, wordIndex })
         wordIndex++
+        drillIndex = 0
       }
     }
 
@@ -158,12 +176,19 @@ export function Practice({ onProgress }: PracticeProps) {
 
   const progressLabel = useMemo(() => {
     if (session.status !== 'active') return undefined
-    // Steps include both drills and check-ins for a word; the count a reader
-    // cares about is words, not the finer-grained step list, so this reads
-    // straight off each step's precomputed `wordIndex`.
+    // Two grains of progress. The word line is the one a reader tracks across
+    // the whole session; the question line shows movement *within* a word, so a
+    // word's four drills no longer read as one frozen number. The check-in isn't
+    // a question, so it carries no question line.
     const totalWords = session.steps[session.steps.length - 1].wordIndex + 1
-    const currentWord = session.steps[session.index].wordIndex
-    return `${currentWord + 1} of ${totalWords}`
+    const currentStep = session.steps[session.index]
+    return {
+      word: `Word ${currentStep.wordIndex + 1} of ${totalWords}`,
+      question:
+        currentStep.kind === 'drill'
+          ? `Question ${currentStep.drillIndex + 1} of ${currentStep.drillCount}`
+          : undefined,
+    }
   }, [session])
 
   if (session.status === 'loading') {
@@ -213,7 +238,12 @@ export function Practice({ onProgress }: PracticeProps) {
         >
           <LeftOutlined />
         </button>
-        <span className={styles.progress}>{progressLabel}</span>
+        <div className={styles.progress}>
+          <span className={styles.progressWord}>{progressLabel?.word}</span>
+          {progressLabel?.question && (
+            <span className={styles.progressQuestion}>{progressLabel.question}</span>
+          )}
+        </div>
       </div>
 
       {step?.kind === 'check-in' && (

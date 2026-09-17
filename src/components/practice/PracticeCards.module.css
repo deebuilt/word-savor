@@ -247,6 +247,12 @@
   margin-top: 16px;
 }
 
+.referenceGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .referenceLabel {
   margin: 0 0 8px;
   font-family: var(--ws-font-body);
