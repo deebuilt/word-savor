@@ -24,31 +24,28 @@
   background: transparent;
 }
 
-/* spotted: an empty ring. Saved, nothing more. */
-.spotted {
+/*
+ * Three marks for two facts.
+ *
+ * Saved is the absence of both, so it gets the faintest ring; practiced fills
+ * the ring in accent; used is solid gold. Not a five-step ramp — the old one
+ * implied a progression the app cannot observe.
+ */
+
+/* saved: an empty ring. In the library, nothing done to it yet. */
+.saved {
   border-color: var(--ws-line-strong);
 }
 
-/* understood: the definition has landed. */
-.understood {
-  border-color: var(--ws-ink-faint);
-}
-
-/* rehearsed: practised, but only inside the app. */
-.rehearsed {
+/* practiced: been through a drill. */
+.practiced {
   border-color: var(--ws-accent);
 }
 
-/* used: said or written it in the wild. The first state that means anything. */
+/* used: the reader says they said or wrote it. */
 .used {
   border-color: var(--ws-gold);
   background: var(--ws-gold);
-}
-
-/* owned: used more than once, unprompted. */
-.owned {
-  border-color: var(--ws-success);
-  background: var(--ws-success);
 }
 
 .label {

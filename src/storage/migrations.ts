@@ -87,6 +87,45 @@ async function deriveSynonymGroups(word: SavedWord): Promise<SavedWord['synonyms
 }
 
 /**
+ * Repair words whose status was reverted by the usage-check-in race.
+ *
+ * Until `recordUsageCheckIn` existed, a check-in wrote the word twice in two
+ * transactions — once for its status and schedule, once to bump its usage
+ * counters. The second write re-read the word and could put back the version
+ * from before the first, losing the status change. The symptom was a word with
+ * a logged `wild` use whose status had fallen back to `rehearsed` or lower, and
+ * a Progress page where "words marked used" read higher than "used".
+ *
+ * The usage log is the evidence here, not the status: a `wild` usage row is a
+ * record of the reader saying they used the word, and rows were never the thing
+ * being lost. So any word with one belongs at `used` or beyond.
+ *
+ * Only ever moves a status forward, and leaves `owned` alone — there is no way
+ * to tell from the log whether a lost update cost a second tap, and guessing
+ * would invent a distinction the app has already decided it cannot observe.
+ */
+export async function repairUsedStatus(): Promise<number> {
+  const db = await getDB()
+  const tx = db.transaction(['usages', 'words'], 'readwrite')
+  const words = tx.objectStore('words')
+  const usages = tx.objectStore('usages')
+
+  let repaired = 0
+  for (const word of await words.getAll()) {
+    if (word.status === 'used' || word.status === 'owned') continue
+
+    const wordUsages = await usages.index('by-word').getAll(word.id)
+    if (!wordUsages.some((usage) => usage.kind === 'wild')) continue
+
+    await words.put({ ...word, status: 'used', updatedAt: Date.now() })
+    repaired++
+  }
+
+  await tx.done
+  return repaired
+}
+
+/**
  * Run every pending migration, once per launch.
  *
  * Deliberately not awaited by the UI: the library renders from what is already
@@ -104,5 +143,14 @@ export async function runMigrations(): Promise<void> {
     // A failed migration must not take the app down with it. The affected words
     // keep their flat synonym list and lose only the synonym-match drill.
     console.warn('[wordsavor] Migration failed; continuing.', error)
+  }
+
+  try {
+    const repaired = await repairUsedStatus()
+    if (repaired > 0) {
+      console.info(`[wordsavor] Restored 'used' status on ${repaired} word(s).`)
+    }
+  } catch (error) {
+    console.warn('[wordsavor] Used-status repair failed; continuing.', error)
   }
 }

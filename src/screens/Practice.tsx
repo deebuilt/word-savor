@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
-import type { SavedWord, WordStatus } from '../types/domain'
-import { addUsage, listWords, saveWord } from '../storage/db'
+import type { PracticeSession, SavedWord, WordStatus } from '../types/domain'
+// Aliased: the handler below is also called `recordUsageCheckIn`, and the local
+// binding would shadow this import — so the handler would call itself.
+import { addSession, listWords, recordUsageCheckIn as writeCheckIn } from '../storage/db'
 import { buildPracticeQueue, type PracticeCard } from '../domain/puzzles'
 import { nextFSRSState, type UsageGrade } from '../domain/scheduler'
 import { DefinitionMatchCard } from '../components/practice/DefinitionMatchCard'
@@ -35,6 +37,11 @@ import styles from './Practice.module.css'
  * The queue is fixed for the session: built once on entry, not re-read as
  * answers come in, so leaving mid-session and coming back does not reshuffle
  * out from under a reader partway through.
+ *
+ * Reaching the end writes one `PracticeSession` row, which is what Progress
+ * counts streaks from. Only a finished run is filed — a session abandoned
+ * halfway is not a day of practice, and recording it would make the streak a
+ * measure of opening the app.
  */
 
 interface PracticeProps {
@@ -63,8 +70,17 @@ type AnsweredStep = { step: Step; correct: boolean; usageGrade?: UsageGrade }
 type SessionState =
   | { status: 'loading' }
   | { status: 'empty' }
-  | { status: 'active'; steps: Step[]; index: number; history: Map<number, AnsweredStep>; correct: number; answered: number }
-  | { status: 'done'; total: number; correct: number }
+  | {
+      status: 'active'
+      steps: Step[]
+      index: number
+      history: Map<number, AnsweredStep>
+      correct: number
+      answered: number
+      /** When the queue was built — the session's real start, not its finish. */
+      startedAt: number
+    }
+  | { status: 'done'; record: PracticeSession }
 
 export function Practice({ onProgress }: PracticeProps) {
   const [session, setSession] = useState<SessionState>({ status: 'loading' })
@@ -99,12 +115,40 @@ export function Practice({ onProgress }: PracticeProps) {
       }
     }
 
-    setSession({ status: 'active', steps, index: 0, history: new Map(), correct: 0, answered: 0 })
+    setSession({
+      status: 'active',
+      steps,
+      index: 0,
+      history: new Map(),
+      correct: 0,
+      answered: 0,
+      startedAt: Date.now(),
+    })
   }, [])
 
   useEffect(() => {
     void start()
   }, [start])
+
+  /*
+   * File the session once it is over.
+   *
+   * Keyed on the record's id and guarded by a ref rather than just by the
+   * effect's dependencies: in development React mounts effects twice, and the
+   * guard is what keeps that from writing two rows for one run. `onProgress`
+   * fires after the write so Progress reads a store that already has it.
+   */
+  const filedSessionId = useRef<string | undefined>(undefined)
+  const record = session.status === 'done' ? session.record : undefined
+
+  useEffect(() => {
+    if (!record || filedSessionId.current === record.id) return
+    filedSessionId.current = record.id
+    void (async () => {
+      await addSession(record)
+      onProgress?.()
+    })()
+  }, [record, onProgress])
 
   const goBack = useCallback(() => {
     setSession((current) => {
@@ -118,7 +162,14 @@ export function Practice({ onProgress }: PracticeProps) {
       if (current.status !== 'active') return current
       const nextIndex = current.index + 1
       if (nextIndex >= current.steps.length) {
-        return { status: 'done', total: current.answered, correct: current.correct }
+        /*
+         * The record is assembled here, where the session's own state is in
+         * hand, but it is *written* from the effect below. A state updater can
+         * be called twice for one transition, and a write in here would file
+         * the same session twice — which is one row too many in the store every
+         * streak is counted from.
+         */
+        return { status: 'done', record: finishedSession(current) }
       }
       return { ...current, index: nextIndex }
     })
@@ -127,10 +178,20 @@ export function Practice({ onProgress }: PracticeProps) {
   const recordDrillAnswer = useCallback(
     async (word: SavedWord, step: Step, correct: boolean) => {
       if (correct) {
-        await addUsage({ id: crypto.randomUUID(), wordId: word.id, at: Date.now(), kind: 'practice' })
-        if (word.status === 'spotted' || word.status === 'understood') {
-          await saveWord({ ...word, status: 'rehearsed' })
-        }
+        /*
+         * One transaction, same reason as the check-in below: written as
+         * `addUsage` then `saveWord`, the status write put back a word object
+         * read before the counter bump and threw the bump away.
+         *
+         * A correct drill never moves a word past `rehearsed` — only real use
+         * reaches `used`. `understood` is folded in because nothing can set it.
+         */
+        const advances = word.status === 'spotted' || word.status === 'understood'
+        await writeCheckIn(
+          word,
+          { status: advances ? 'rehearsed' : word.status, fsrs: word.fsrs },
+          { id: crypto.randomUUID(), wordId: word.id, at: Date.now(), kind: 'practice' },
+        )
         onProgress?.()
       }
 
@@ -155,10 +216,19 @@ export function Practice({ onProgress }: PracticeProps) {
     async (word: SavedWord, step: Step, grade: UsageGrade) => {
       const fsrs = nextFSRSState(word.fsrs, grade)
       const nextStatus = statusAfterUsage(word.status, grade)
-      await saveWord({ ...word, fsrs, status: nextStatus })
-      if (grade === 'used' || grade === 'almost') {
-        await addUsage({ id: crypto.randomUUID(), wordId: word.id, at: Date.now(), kind: 'wild' })
-      }
+      /*
+       * Status, schedule, and the use itself go in one transaction. Written as
+       * two calls this raced: the usage write re-read the word and could put
+       * back the pre-status version, so a word could log a use and keep its old
+       * status. Only a real use logs one.
+       */
+      await writeCheckIn(
+        word,
+        { status: nextStatus, fsrs },
+        grade === 'used'
+          ? { id: crypto.randomUUID(), wordId: word.id, at: Date.now(), kind: 'wild' }
+          : undefined,
+      )
       onProgress?.()
 
       setSession((current) => {
@@ -205,7 +275,7 @@ export function Practice({ onProgress }: PracticeProps) {
       <div className={styles.screen}>
         <h1 className={styles.title}>Practice</h1>
         <p className={styles.state}>
-          Nothing to practise yet. Save a few more words in Look Up, and there will be enough
+          Nothing to practice yet. Save a few more words in Look Up, and there will be enough
           here to work through.
         </p>
       </div>
@@ -217,10 +287,10 @@ export function Practice({ onProgress }: PracticeProps) {
       <div className={styles.screen}>
         <h1 className={styles.title}>Session complete</h1>
         <p className={styles.summary}>
-          {session.correct} of {session.total} landed.
+          {session.record.correct} of {session.record.total} landed.
         </p>
         <button type="button" className={styles.again} onClick={() => void start()}>
-          Practise again
+          Practice again
           <RightOutlined />
         </button>
       </div>
@@ -295,12 +365,53 @@ function DrillCardView({
 }
 
 /**
- * Status only moves on the usage check-in — a drill answered correctly moves
- * a word to `rehearsed` at most (handled at the call site), never past it.
- * Real use is the one thing that should ever reach `used` or `owned`.
+ * The session as a stored record.
+ *
+ * `total` is what was answered, not what was offered: a run walked away from
+ * two questions in scored two, and inflating the denominator with untouched
+ * drills would make every honest session look like a failed one.
+ *
+ * `wordIds` covers every word the queue held, answered or not, because it is
+ * the record of what the session was *about* — which words came up on a given
+ * day is the question this field exists to answer later.
+ */
+function finishedSession(session: {
+  steps: Step[]
+  correct: number
+  answered: number
+  startedAt: number
+}): PracticeSession {
+  const wordIds = [
+    ...new Set(
+      session.steps.map((step) => (step.kind === 'drill' ? step.card.word.id : step.word.id)),
+    ),
+  ]
+
+  return {
+    id: crypto.randomUUID(),
+    startedAt: session.startedAt,
+    endedAt: Date.now(),
+    mode: 'mixed',
+    wordIds,
+    correct: session.correct,
+    total: session.answered,
+  }
+}
+
+/**
+ * Status only moves on the usage check-in — a drill answered correctly moves a
+ * word to `rehearsed` at most (handled at the call site), never past it.
+ *
+ * **`owned` is no longer written.** It used to be set by tapping "Used it" a
+ * second time, which records coming back to practice rather than using the word
+ * twice, so nothing reports it as distinct from `used`. Writing it anyway would
+ * keep a fifth state alive in the data purely to be folded away on read.
+ * Existing `owned` words are left alone and read as `used`.
+ *
+ * The count of reported uses lives in the `usages` log, where it belongs — a
+ * tally of rows, not a status.
  */
 function statusAfterUsage(current: WordStatus, grade: UsageGrade): WordStatus {
-  if (grade === 'used') return current === 'used' || current === 'owned' ? 'owned' : 'used'
-  if (grade === 'almost') return current === 'spotted' ? 'rehearsed' : current
+  if (grade === 'used') return current === 'owned' ? 'owned' : 'used'
   return current
 }

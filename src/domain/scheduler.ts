@@ -19,11 +19,10 @@ import type { FSRSState } from '../types/domain'
  * the library is for. Only the meaning of the four buttons is WordSavor's own.
  */
 
-export type UsageGrade = 'used' | 'almost' | 'fuzzy' | 'not-yet'
+export type UsageGrade = 'used' | 'fuzzy' | 'not-yet'
 
 const GRADE_TO_RATING: Record<UsageGrade, Grade> = {
   used: Rating.Easy,
-  almost: Rating.Good,
   fuzzy: Rating.Hard,
   'not-yet': Rating.Again,
 }

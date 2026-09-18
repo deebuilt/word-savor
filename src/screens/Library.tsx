@@ -162,7 +162,7 @@ function Row({ word, onOpen }: { word: SavedWord; onOpen?: (id: string) => void 
         <Word size="row" className={styles.rowWord}>
           {word.word}
         </Word>
-        <StatusMark status={word.status} />
+        <StatusMark word={word} />
       </span>
       {definition && <span className={styles.rowDefinition}>{definition}</span>}
     </button>

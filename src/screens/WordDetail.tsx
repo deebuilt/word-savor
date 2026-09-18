@@ -231,7 +231,7 @@ export function WordDetail({
 
         <div className={styles.meta}>
           {word ? (
-            <StatusMark status={word.status} showLabel />
+            <StatusMark word={word} showLabel />
           ) : (
             <span className={styles.unsaved}>Not in your library</span>
           )}

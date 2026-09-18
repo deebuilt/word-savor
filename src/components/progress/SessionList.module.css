@@ -1,0 +1,50 @@
+/*
+ * Past sessions: when, score, accuracy.
+ *
+ * Three columns with the date flexible and both figures fixed, so the numbers
+ * line up down the right regardless of how long a date reads.
+ */
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 7px 0;
+}
+
+.row + .row {
+  border-top: 1px solid var(--ws-line);
+}
+
+.when {
+  flex: 1;
+  min-width: 0;
+  font-size: calc(14px * var(--ws-scale-body));
+  color: var(--ws-ink-soft);
+}
+
+.score {
+  flex: none;
+  font-size: calc(13px * var(--ws-scale-body));
+  font-variant-numeric: tabular-nums;
+  color: var(--ws-ink-faint);
+}
+
+.accuracy {
+  flex: none;
+  /* A fixed width so the percent column is straight whether it reads 8% or
+     100% — the figures are here to be compared down the list. */
+  min-width: 44px;
+  text-align: right;
+  font-family: var(--ws-font-word);
+  font-size: calc(15px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--ws-ink);
+}

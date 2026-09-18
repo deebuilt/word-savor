@@ -1,0 +1,222 @@
+/*
+ * Progress.
+ *
+ * An editorial column, not a dashboard. Three sections down the page separated
+ * by rules and space — no cards, no tiles, no grid of counters. A dashboard
+ * layout would make five numbers look equally important, and they are not: the
+ * ladder is the argument, the streak is encouragement, and the week is detail.
+ *
+ * The one large figure on the screen is the streak count, set in the word face.
+ * Type carries the hierarchy so nothing else has to be boxed to look
+ * significant.
+ */
+
+.screen {
+  padding: 20px 16px 32px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.title {
+  margin: 0 0 8px;
+  font-family: var(--ws-font-word);
+  font-size: calc(38px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-bold);
+  line-height: calc(1.1 * var(--ws-leading-word));
+  letter-spacing: -0.02em;
+  color: var(--ws-ink);
+}
+
+/* Sections ----------------------------------------------------------------- */
+
+/*
+ * A rule above each block rather than a border around it.
+ *
+ * The rule groups by separating, which is what a magazine spread does and what
+ * a card does not — a card says "this is a unit of data", a rule says "a new
+ * subject starts here". `:first-of-type` keeps the topmost block from sitting
+ * under a line that separates it from nothing.
+ */
+.block {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--ws-line);
+}
+
+.block:first-of-type {
+  margin-top: 20px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.heading {
+  margin: 0 0 12px;
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}
+
+/* The streak figure -------------------------------------------------------- */
+
+/*
+ * Number and unit on one baseline.
+ *
+ * `baseline` alignment rather than centre, so "days running" sits on the
+ * figure's foot the way a pull quote's attribution does. Centring it against a
+ * 52px numeral would float the words in the middle of its height.
+ */
+.figureLine {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+
+.figure {
+  font-family: var(--ws-font-word);
+  font-size: calc(52px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-bold);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  /* Gold is the streak colour throughout the app — the same token the `used`
+     status carries, because both mark the same thing: it left the app. */
+  color: var(--ws-gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.figureUnit {
+  font-family: var(--ws-font-body);
+  font-size: calc(17px * var(--ws-scale-body));
+  color: var(--ws-ink-soft);
+}
+
+/* Prose -------------------------------------------------------------------- */
+
+/*
+ * The sentence that says what a number means. Reading size, ink-soft — it is
+ * content, not a caption, and on this screen it is usually the part that
+ * actually informs.
+ */
+.reading {
+  margin: 0;
+  font-size: calc(15px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  color: var(--ws-ink-soft);
+  text-wrap: pretty;
+}
+
+/* The quieter second line — a longest-streak note, or the week's drill count. */
+.aside {
+  margin: 6px 0 0;
+  font-size: calc(13px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  color: var(--ws-ink-faint);
+  text-wrap: pretty;
+}
+
+/* Stat rows ---------------------------------------------------------------- */
+
+/*
+ * Label left, figure right, one per line.
+ *
+ * A definition list because that is what this is — each figure is defined by
+ * its label, and the pairing is the content. Rows rather than a comma-joined
+ * sentence: four unrelated numbers in one line make the reader work out which
+ * measures what, and rows put every figure in the same column so they can be
+ * read down.
+ */
+.stats {
+  margin: 0;
+  padding: 0;
+}
+
+.stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+}
+
+.stat + .stat {
+  border-top: 1px solid var(--ws-line);
+}
+
+.statLabel {
+  min-width: 0;
+  font-size: calc(14px * var(--ws-scale-body));
+  color: var(--ws-ink-soft);
+}
+
+.statValue {
+  flex: none;
+  margin: 0;
+  font-family: var(--ws-font-word);
+  font-size: calc(17px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-medium);
+  /* Tabular so the figures line up down the right edge. */
+  font-variant-numeric: tabular-nums;
+  color: var(--ws-ink);
+}
+
+/* Rarity tones ------------------------------------------------------------- */
+
+/*
+ * The rarity ramp, owned here rather than by `SpreadBar` — the bar is layout
+ * and knows nothing about what a rarity scale means.
+ *
+ * Deliberately a single hue darkening toward the rare end, not five unrelated
+ * colors. Rarity is ordered, so the scale should read as one direction of
+ * travel; five hues would imply five categories with no sequence. Accent is the
+ * app's own blue, so the darkest band carries the most weight visually as well
+ * as semantically.
+ */
+
+.toneEveryday {
+  background: var(--ws-line);
+}
+
+.toneCommon {
+  background: var(--ws-line-strong);
+}
+
+.toneUncommon {
+  background: var(--ws-ink-faint);
+}
+
+.toneRare {
+  background: var(--ws-accent);
+}
+
+/* The rarest band takes the gold, the one color the app reserves for what
+   matters — a very rare word is the collection's whole point. */
+.toneVeryRare {
+  background: var(--ws-gold);
+}
+
+/* Subheading --------------------------------------------------------------- */
+
+/*
+ * A second level inside a block, for the session list under its figures. Set
+ * quieter than the block heading so the nesting is legible without indentation.
+ */
+.subheading {
+  margin: 20px 0 4px;
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  color: var(--ws-ink-soft);
+}
+
+/* States ------------------------------------------------------------------- */
+
+.state {
+  margin-top: 48px;
+  text-align: center;
+  color: var(--ws-ink-faint);
+  font-size: calc(15px * var(--ws-scale-body));
+  line-height: calc(1.6 * var(--ws-leading-body));
+}

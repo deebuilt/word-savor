@@ -1,0 +1,78 @@
+/*
+ * Weekly counts as bars, each with its value printed above it.
+ *
+ * Flexbox rather than SVG coordinates: the bars are plain blocks whose heights
+ * are percentages, so the chart reflows at any width with no viewBox maths and
+ * no re-render on resize.
+ *
+ * At 375px, twelve columns get about 27px each, which is enough for a
+ * two-digit figure at 10px. Three digits would crowd — if a week can plausibly
+ * exceed 99, the caller should ask for fewer weeks rather than this file
+ * shrinking the type further.
+ */
+
+.chart {
+  margin: 0;
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 72px;
+}
+
+/*
+ * One equal column per week, so spacing never drifts with the values. The
+ * column is a bottom-aligned stack: value on top, bar beneath it.
+ */
+.slot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 3px;
+  height: 100%;
+  min-width: 0;
+}
+
+.value {
+  font-family: var(--ws-font-word);
+  font-size: calc(10px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-medium);
+  /* Tabular so the figures sit optically centred over their bars whatever the
+     digits are. */
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--ws-ink);
+}
+
+/* A quiet week's dash should not carry the same weight as a real figure. */
+.valueEmpty {
+  color: var(--ws-ink-faint);
+}
+
+.bar {
+  width: 100%;
+  border-radius: 1px;
+  background: var(--ws-accent);
+  transition: height 320ms ease;
+}
+
+/*
+ * A week with nothing in it still draws a baseline stub, so the gap reads as a
+ * measured zero rather than a rendering failure.
+ */
+.empty {
+  background: var(--ws-line);
+}
+
+.axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: calc(11px * var(--ws-scale-body));
+  color: var(--ws-ink-faint);
+}

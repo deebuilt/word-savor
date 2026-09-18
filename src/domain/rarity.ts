@@ -28,11 +28,22 @@
 
 export type RarityBand = 'everyday' | 'common' | 'uncommon' | 'rare' | 'very-rare'
 
-interface Band {
+export interface Band {
   id: RarityBand
   /** Frequency at or above which a word falls in this band. */
   floor: number
   label: string
+  /**
+   * A word that actually falls in this band, for display.
+   *
+   * "Uncommon" and "Rare" mean nothing on their own — they are positions on a
+   * scale the reader has no feel for. One real example does what the label
+   * cannot: it puts the band somewhere the reader can stand.
+   *
+   * Every one of these is taken from the measured table above, so the example
+   * is genuinely in the band it illustrates rather than chosen for flavour.
+   */
+  example: string
 }
 
 /*
@@ -42,12 +53,12 @@ interface Band {
  * where a word stops being one most readers meet in passing. `rare` at 0.05
  * puts "perspicacious" and "obfuscate" together, which matches how they read.
  */
-const BANDS: readonly Band[] = [
-  { id: 'everyday', floor: 50, label: 'Everyday' },
-  { id: 'common', floor: 5, label: 'Common' },
-  { id: 'uncommon', floor: 0.5, label: 'Uncommon' },
-  { id: 'rare', floor: 0.05, label: 'Rare' },
-  { id: 'very-rare', floor: 0, label: 'Very rare' },
+export const BANDS: readonly Band[] = [
+  { id: 'everyday', floor: 50, label: 'Everyday', example: 'run' },
+  { id: 'common', floor: 5, label: 'Common', example: 'gather' },
+  { id: 'uncommon', floor: 0.5, label: 'Uncommon', example: 'ephemeral' },
+  { id: 'rare', floor: 0.05, label: 'Rare', example: 'obfuscate' },
+  { id: 'very-rare', floor: 0, label: 'Very rare', example: 'sesquipedalian' },
 ]
 
 export function rarityBand(frequency: number): RarityBand {

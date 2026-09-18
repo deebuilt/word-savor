@@ -9,6 +9,7 @@ import { TypefacePicker } from './components/chrome/TypefacePicker'
 import { Library } from './screens/Library'
 import { LookUp } from './screens/LookUp'
 import { Practice } from './screens/Practice'
+import { Progress } from './screens/Progress'
 import { WordDetail } from './screens/WordDetail'
 import { clearShareUrl, readSharedCapture } from './domain/shareTarget'
 import { listDueWords } from './storage/db'
@@ -27,8 +28,8 @@ import styles from './App.module.css'
  * URL handling is `/share`, the share-target handler, and that is a single
  * entry point rather than a reason to route the whole app.
  *
- * Library and Look Up are real; Practice and Progress are still placeholders.
- * `docs/BUILD_PLAN.md` has the order they land in.
+ * Library, Look Up, Practice, and Progress are real. More holds the appearance
+ * settings and will gain backup. `docs/BUILD_PLAN.md` has what is still to come.
  */
 
 /**
@@ -73,9 +74,26 @@ export default function App() {
    */
   const [libraryToken, setLibraryToken] = useState(0)
 
+  /*
+   * Bumped whenever something Progress reports on changes.
+   *
+   * Progress is the one screen whose numbers all move while it is closed: a
+   * session finished on the Practice tab changes the streak, the ladder, and
+   * the week at once. Without this it would show whatever was true when the tab
+   * was first opened, which on a tab you return to is almost never now.
+   */
+  const [progressToken, setProgressToken] = useState(0)
+
+  const handleProgressed = useCallback(() => {
+    void refreshCounts()
+    setProgressToken((token) => token + 1)
+  }, [refreshCounts])
+
   const handleSaved = useCallback(() => {
     void refreshCounts()
     setLibraryToken((token) => token + 1)
+    // A saved word joins the ladder at `spotted`, so Progress is stale too.
+    setProgressToken((token) => token + 1)
   }, [refreshCounts])
 
   /*
@@ -107,6 +125,8 @@ export default function App() {
   const handleDeleted = useCallback(() => {
     setWordStack([])
     setLibraryToken((token) => token + 1)
+    // A deleted word leaves the ladder, so its distribution changed.
+    setProgressToken((token) => token + 1)
     void refreshCounts()
   }, [refreshCounts])
 
@@ -150,8 +170,9 @@ export default function App() {
               initialContext={SHARED?.context}
             />
           )}
-          {tab === 'practice' && <Practice onProgress={refreshCounts} />}
-          {(tab === 'progress' || tab === 'more') && <Placeholder tab={tab} faces={faces} />}
+          {tab === 'practice' && <Practice onProgress={handleProgressed} />}
+          {tab === 'progress' && <Progress refreshToken={progressToken} />}
+          {tab === 'more' && <More faces={faces} />}
         </main>
         <BottomBar active={tab} onSelect={selectTab} dueCount={dueCount} />
       </div>
@@ -161,66 +182,54 @@ export default function App() {
 
 /* -------------------------------------------------------------------------- */
 
-interface PlaceholderProps {
-  tab: 'progress' | 'more'
+interface MoreProps {
   faces: ReturnType<typeof useTypefaces>
 }
 
 /**
- * Scaffold-only. Each tab states what it will hold, so the shell can be walked
- * through on a phone before any of it is built — which is the point of standing
- * the skeleton up first.
+ * More — appearance now, backup and about later.
  *
- * More is the exception: its settings are real, because the face pickers need
- * somewhere to live now rather than after the screens are written against a
- * hardcoded family.
+ * Still the only screen defined inside the shell rather than in `screens/`. It
+ * is two pickers and a sentence, and moving it out would be a file whose whole
+ * content is the markup below. It moves the day it gains a third thing.
  */
-function Placeholder({ tab, faces }: PlaceholderProps) {
-  if (tab === 'more') {
-    return (
-      <div className={styles.screen}>
-        <h1 className={styles.title}>More</h1>
-        <p className={styles.body}>
-          Appearance now; backup and about once there is something to back up.
-        </p>
-
-        {/*
-          Theme is not here — it lives in the header, where it is one tap from
-          anywhere. The reading face stays: it is a considered choice that wants
-          room to preview each option, not a control to flip in passing.
-        */}
-        <section className={styles.section}>
-          <TypefacePicker
-            name="word-face"
-            label="Word face"
-            hint="How saved words are set, wherever they appear."
-            /* A word worth previewing in: long enough to show the letterforms,
-               and one someone might genuinely have saved. */
-            sample="perspicacious"
-            large
-            value={faces.preference.word}
-            onChange={faces.setWordFace}
-          />
-        </section>
-
-        <section className={styles.section}>
-          <TypefacePicker
-            name="body-face"
-            label="Reading face"
-            hint="Definitions, notes, and everything that is not the word."
-            sample="Having a ready insight into and understanding of things."
-            value={faces.preference.body}
-            onChange={faces.setBodyFace}
-          />
-        </section>
-      </div>
-    )
-  }
-
+function More({ faces }: MoreProps) {
   return (
     <div className={styles.screen}>
-      <h1 className={styles.title}>Progress</h1>
-      <p className={styles.body}>Streaks, rarity, and every sentence you have written.</p>
+      <h1 className={styles.title}>More</h1>
+      <p className={styles.body}>
+        Appearance now; backup and about once there is something to back up.
+      </p>
+
+      {/*
+        Theme is not here — it lives in the header, where it is one tap from
+        anywhere. The reading face stays: it is a considered choice that wants
+        room to preview each option, not a control to flip in passing.
+      */}
+      <section className={styles.section}>
+        <TypefacePicker
+          name="word-face"
+          label="Word face"
+          hint="How saved words are set, wherever they appear."
+          /* A word worth previewing in: long enough to show the letterforms,
+             and one someone might genuinely have saved. */
+          sample="perspicacious"
+          large
+          value={faces.preference.word}
+          onChange={faces.setWordFace}
+        />
+      </section>
+
+      <section className={styles.section}>
+        <TypefacePicker
+          name="body-face"
+          label="Reading face"
+          hint="Definitions, notes, and everything that is not the word."
+          sample="Having a ready insight into and understanding of things."
+          value={faces.preference.body}
+          onChange={faces.setBodyFace}
+        />
+      </section>
     </div>
   )
 }

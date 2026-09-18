@@ -19,10 +19,19 @@ interface UsagePromptCardProps {
   onAnswer: (grade: UsageGrade) => void
 }
 
+/*
+ * Three answers, not four.
+ *
+ * "Almost had it" was dropped: nobody could say what almost using a word means,
+ * and it was logging a use in the wild for a word that never left your mouth —
+ * which inflated the usage count and the Progress page with fumbles. A miss is
+ * not a use. Its FSRS rating was the only thing it did that the remaining three
+ * do not, and a scheduling nuance nobody can see is not worth a button nobody
+ * can read.
+ */
 const ANSWERS: Array<{ grade: UsageGrade; label: string; hint: string }> = [
   { grade: 'used', label: 'Used it', hint: 'Said or wrote it for real' },
-  { grade: 'almost', label: 'Almost had it', hint: 'Reached for it, close enough' },
-  { grade: 'fuzzy', label: 'Still fuzzy', hint: 'Recognise it, not ready to reach for it' },
+  { grade: 'fuzzy', label: 'Still fuzzy', hint: 'Know it when you see it, not ready to use it' },
   { grade: 'not-yet', label: 'Not yet', hint: 'No attempt since last time' },
 ]
 

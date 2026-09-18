@@ -1,0 +1,355 @@
+# Stats — what to show, and where
+
+## The rules every stat must follow
+
+Settled 2026-09-17 after the Progress page reported a four-word library as
+"saved 0, practiced 2". **These are binding for every future stat, on every
+page.** Read them before adding a number to any screen.
+
+### 1. Counts come from the `usages` log, never from `SavedWord.status`
+
+`status` is **one slot per word**. A word can be saved *and* practiced *and*
+used — all true at once, none cancelling the others — and a single value cannot
+hold that. Writing `rehearsed` erased "saved"; writing `used` erased
+"practiced". Any count derived from `status` is therefore wrong by construction,
+which is exactly how "saved 0" happened with four words in the library.
+
+`usages` is an append-only event log. Each question is asked of it
+independently, and the answers are allowed to overlap. `libraryTotals()` in
+[`domain/progress.ts`](../src/domain/progress.ts) is the pattern to copy.
+
+`status` keeps one legitimate use: `used` is the single value a reader genuinely
+reports, so it answers "has *this* word been used" for one word. Never for a
+count.
+
+### 2. Overlapping counts must not be drawn as a stacked bar
+
+A stacked proportional bar can only show **parts of one whole**. These counts
+overlap, so segmenting them was what made "saved" render as an empty row. Show
+overlapping figures as plain counts out of the total (`3 of 4`). A bar is only
+honest for a genuine either/or.
+
+### 3. Never report a number the app cannot observe
+
+Two stored statuses were dropped from every screen for failing this:
+
+- **`understood`** — nothing in the app can set it. There is no surface where a
+  reader says they understand a word.
+- **`owned`** — set by tapping "Used it" a second time, which records *returning
+  to practice*, not using a word twice. As of 2026-09-17 it is **no longer
+  written**; existing values read as `used`.
+
+### 4. Say what was actually measured
+
+`kind: 'wild'` is **self-reported and unverifiable**. So:
+
+- **"Marked used"**, never "used N times". The count is button taps.
+- Prefer **distinct words marked** over a tap total. "6 across 2 words" was
+  unreadable and measured one word marked repeatedly across sessions.
+- A drill is **one question**. A word generates about four per session.
+
+### 5. Absence is not zero
+
+Accuracy is `undefined`, not `0`, when nothing was answered — "0%" reads as
+failure where the truth is that nothing happened. Omit the row instead.
+
+### 6. Name the window, or do not imply one
+
+A fixed "last seven days" heading with no control is a stat pretending to be a
+view. Either give the range a control or show a trend where the axis is visible.
+
+---
+
+
+Written 2026-09-17, during the Progress-page cleanup session. This doc covers
+the data points worth surfacing across the app and which screen each belongs on.
+It is the follow-on from `practice-progress-plan.md`, which built the Progress
+page's first pass (status breakdown, streak, last-seven-days).
+
+## The organizing principle
+
+The dividing line is the **scope of the question being asked**:
+
+| Screen | The question it answers |
+| --- | --- |
+| **Progress** | About the whole library and your habits. "Am I building this, and what kind of vocabulary is it?" |
+| **Practice** | About the session you just finished, and past sessions. "How did I do, and how does that compare?" |
+| **Library** | Ranking or filtering words against each other. "Which words need attention?" |
+| **Word detail** | One word's own history. "What has happened with this word?" |
+
+Same underlying data, four altitudes. A stat belongs on the screen where its
+question actually gets asked.
+
+## What is already stored vs. what needs building
+
+This is the part that decides how much is cheap. **Most of it is already in the
+database** — the app has been recording more than it displays since Phase 1.
+
+| Data | Stored? | Where |
+| --- | --- | --- |
+| Session date, correct, total, wordIds | **Yes**, since 2026-09-17 | `sessions` store, `by-date` index |
+| Every use, dated, wild vs. practice | **Yes**, Phase 2 | `usages` store, `by-word` + `by-date` |
+| Per-word use count and last-used date | **Yes**, denormalized | `SavedWord.usageCount`, `lastUsedAt` |
+| Word rarity (frequency per million) | **Yes**, at save time | `SavedWord.rarity`, `by-rarity` index |
+| Date each word was saved | **Yes**, Phase 1 | `SavedWord.addedAt`, `by-added` index |
+| Word status | **Yes**, Phase 1 | `SavedWord.status`, `by-status` index |
+| FSRS schedule and next due date | **Yes**, Phase 2 | `SavedWord.fsrs` |
+| Where a word was encountered | Store exists, **barely written** | `encounters` store |
+| **Per-word drill results** | **No** | — needs a schema decision |
+
+So: of everything below, only the per-word practice record needs new storage.
+Everything else is a read and a render.
+
+---
+
+## Progress page
+
+### 1. Rarity spread — build this first
+
+**Status: all data present. Nothing to store.**
+
+Distribution of the library across the five rarity bands that
+[`rarity.ts`](../src/domain/rarity.ts) already defines — everyday, common,
+uncommon, rare, very rare. `rarityBand()` is written and tested.
+
+**Why it leads:** it is the only stat in the app that describes *what kind* of
+vocabulary is being built rather than how much of it there is. It also needs no
+history — it is true and interesting the first time you open it, unlike every
+session-based number.
+
+It answers a real question Ruthnie raised: *coalesce* and *acquiesce* are words
+that fit into ordinary speech, *obfuscate* takes intent to place. A library
+skewed to "very rare" is a library that will be hard to actually use, and that
+is worth knowing about the collection as a whole.
+
+**Design:** the same bar-plus-rows treatment as the status breakdown, so the two
+read as one system.
+
+**Caveat that must be handled:** `rarity` is optional — Datamuse does not score
+every word. Unscored words must be **excluded and counted separately**
+("3 unscored"), never folded into "very rare." `rarityLabel()` already returns
+`undefined` rather than inventing a band, and that decision has to be honored
+here.
+
+### 2. Uses over time
+
+**Status: all data present.**
+
+Wild uses per week, over the last several weeks, from the `usages` store's
+`by-date` index.
+
+**This replaces the "Last seven days" block.** That block's real problem is not
+its numbers but that it is a **fixed window with no control** — a label saying
+"last seven days" with no way to change the range is a stat pretending to be a
+view. Two ways out: add a range control, or make the time axis visible in a
+trend and need no control at all.
+
+**Recommendation: the trend.** Fewer controls, more information, and it shows
+direction, which a single window never can.
+
+### 3. Words saved per week
+
+**Status: all data present** (`addedAt`, `by-added` index).
+
+Capture rate over the last 8–12 weeks.
+
+**Keep it visually quiet.** This measures *collecting*, not learning. It is
+genuinely useful — capture is the top of the funnel and the app's core loop —
+but it must not compete with usage for attention, or the page starts rewarding
+the easy action.
+
+### 4. Drill accuracy across sessions
+
+**Status: stored as of 2026-09-17. No history yet — it accumulates from here.**
+
+Accuracy for the last N sessions, plus the current figure.
+
+**Session-indexed, not date-indexed.** A 20-word library builds roughly 100
+steps, so sessions are long and infrequent — possibly one a week. A
+"last 7 days" accuracy figure will often be empty, while "last 5 sessions,
+whenever they happened" always says something.
+
+**Also enabled by the same read:** total sessions, and words practiced per
+session.
+
+### Not on this page
+
+- Time since last use — per-word, belongs in Library.
+- Anything that ranks individual words — that is Library's job.
+
+---
+
+## Practice page
+
+### 5. Session history
+
+**Status: data stored, nothing reads it back.**
+
+This is the clearest gap found in the session. Practice currently **loops**:
+finish a session, get "12 of 13 landed," and the only way forward is starting
+another. The score is written to the `sessions` store and then never shown
+again. Scores are being kept with nowhere to see them.
+
+**Build:** a history view on Practice — a drawer or a second view, not a new nav
+tab — listing past sessions with date, score, and word count. Ruthnie's framing:
+*"somewhere to see the practice history so I can see how I've done over time."*
+
+**Also fix the end-of-session screen.** It shows the score and one "Practice
+again" button. It should be the natural place to see how this session compares to
+the last few, since that is the moment the question is actually being asked.
+
+### 6. Session length — a real constraint, not a stat
+
+Every word in the library gets its full run of drills each session, so a 20-word
+library is ~100 steps. That is very likely why no session had been completed
+before today.
+
+This **starves every session-based stat** on the Progress page. It is a Practice
+design problem rather than a stats problem, but it caps what the stats can ever
+show, so it belongs in the same conversation. Worth deciding whether a session
+should have a length bound.
+
+---
+
+## Library page
+
+### 7. A stat header above the list
+
+**Status: all data present.**
+
+- **Total words** — already shown.
+- **Collection rarity** — a one-line summary, e.g. the median band. Distinct
+  from the Progress breakdown: one line of context here, the full distribution
+  there.
+
+### 8. Sort and filter by what the stats reveal
+
+**Status: all data present** (`usageCount`, `lastUsedAt`, `addedAt`).
+
+- **Marked used N times** — from `usageCount`. The label must say **marked**
+  used, because it counts check-in taps, not observed uses. See the honesty note
+  below.
+- **Time since last use** — from `lastUsedAt`.
+- **Going cold** — saved a while ago, `usageCount === 0`.
+
+**These belong as sort options and filters, not as numbers printed on every
+row.** The Library's job is finding a word; a stat earns its place there by
+**ordering the list**, not by decorating it. A count on all two hundred rows is
+noise, while "sort by longest unused" is a tool.
+
+---
+
+## Word detail page
+
+### 9. One word's history
+
+- **Marked used N times, and when** — `listUsages(wordId)` already exists.
+- **Rarity band, with the frequency behind it** — stored.
+- **Next scheduled review** — `fsrs.due` is stored and currently invisible.
+- **Encounters** — where the word was met. The `encounters` store and
+  `listEncounters()` both exist; almost nothing writes to it yet, so this needs
+  the capture path filled in first.
+- **Practice record for this word** — **needs new storage.** See below.
+
+---
+
+## The two decisions to make before building
+
+### Per-word drill results are not stored
+
+`PracticeSession.wordIds` records which words a session covered, but **not
+whether each one was answered correctly.** So "how am I doing on *obfuscate*
+specifically" cannot be answered today.
+
+Cheapest honest fix: add `results: Array<{ wordId: string; correct: boolean }>`
+to `PracticeSession`. Worth settling **before** the first stats build, because
+adding it later means a migration against real session history — the same
+argument that put all six stores in at version 1.
+
+### There is no router
+
+Tabs are local state ([`App.tsx`](../src/App.tsx) explains the original
+reasoning, which was sound at five destinations and no deep links). The cost
+grows as the app gains per-word and per-session views: no deep links, no
+back-button, no shareable URL for a word, and a session-history view that cannot
+be linked to.
+
+Not blocking any stat below, but it is a real and growing cost, and #5 and #9
+both make it hurt more.
+
+---
+
+## Build order
+
+1. ~~**Rarity spread on Progress**~~ — **done 2026-09-17.**
+2. ~~**Session history**~~ — **done 2026-09-17**, on Progress rather than
+   Practice (see below).
+3. ~~**Uses-over-time trend**~~ — **done 2026-09-17**, replacing the fixed
+   seven-day window.
+4. ~~**Words saved per week**~~ — **done 2026-09-17.**
+5. **Library sort and filter** — a bigger piece; a list redesign, not a stat.
+6. **Word-detail history** — needs the per-word practice record designed first.
+
+## What shipped — 2026-09-17
+
+The Progress page is complete. Sections, in order: library totals, rarity
+spread, streak, words saved per week, words marked used per week, practice.
+
+**Session history landed on Progress, not Practice.** The plan put it on
+Practice, but everything a reader compares it against — accuracy, streak,
+totals — is already here, and splitting the history from its context would mean
+two screens to answer one question. Practice's end-of-session screen is still
+worth improving separately.
+
+**The seven-day block is gone.** Its rows either duplicated the lifetime totals
+above them (with one session's history, "words marked used this week" printed
+the same figure as "marked used") or needed a range control the block did not
+have. The trends replace it, with the time axis visible so no dropdown is
+implied.
+
+**Two reusable components**, both taking their colors from the caller so neither
+knows what any scale means:
+
+- `SpreadBar` — a proportional bar over a legend. **Only for genuine
+  parts-of-a-whole splits.** Rarity qualifies; the library totals do not.
+- `TrendBars` — weekly counts as bars. Bars rather than a line, because these
+  are discrete per-week counts and a line would draw a slope between two weeks
+  as though something happened in between. Empty weeks render as a faint stub,
+  since a gap is information.
+
+Hand-rolled with flexbox and percentage heights, no charting dependency and no
+SVG viewBox maths, so they reflow at any width and theme from the same custom
+properties as everything else.
+
+**Rarity honors the unscored rule.** Words Datamuse never scored are counted
+and stated separately, never folded into "very rare" — that would overstate the
+collection in exactly the direction its owner wants to believe. Shares are out
+of scored words only.
+
+**Accuracy is session-indexed**, over the last five sessions, and **weighted by
+drills answered rather than averaged across sessions** — a 9-of-10 and a 1-of-10
+is 50%, not 55%. Sessions that answered nothing are skipped, not counted as zero.
+
+**56 tests pass** across two harnesses, covering the week-bucket boundary (day 6
+vs day 7, no double-count and no gap), real measured words landing in their
+documented rarity bands, unscored handling including `NaN`, and the guard that
+no library count can exceed the total.
+
+## Two build notes
+
+**Charts.** Several of these want a line or bar over time and there is no
+charting library in the project. Recommendation: hand-rolled inline SVG
+sparklines rather than a dependency for four small charts. They are a few dozen
+lines, they theme from the same CSS properties as everything else, and they do
+not add a bundle.
+
+**The honesty rule, carried forward from this session.** Two statuses were
+dropped from the Progress page for failing it: `understood`, which nothing in
+the app can set, and `owned`, which counts "tapped *Used it* a second time" —
+that measures *returning to practice*, not using a word twice. The app has no
+way to observe real-world use, so any stat implying it does is inventing
+evidence.
+
+Every stat above must name what it actually measured. `usageCount` is
+**marked**-used, not used. A stat that cannot be honestly labeled does not go on
+a screen.

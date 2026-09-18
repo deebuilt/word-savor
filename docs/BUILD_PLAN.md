@@ -268,10 +268,25 @@ Uncapped, "bank" yields 40 senses and "good" returns hundreds of synonyms.
 
 ## Phase 3 — Progress
 
-- [ ] Streaks, from `sessions`
-- [ ] Rarity distribution across the library
+- [x] Streaks, from `sessions` *(2026-09-17)*
+- [x] Library totals — saved, practiced, marked used *(2026-09-17)*
+- [x] Rarity distribution across the library *(2026-09-17)*
+- [x] Words saved per week, and words marked used per week *(2026-09-17)*
+- [x] Practice history — past sessions and accuracy *(2026-09-17)*
 - [ ] Usage history — every sentence written, by word
 - [ ] Constellations, from `related[]`
+
+**The Progress page is complete.** Sessions are written on completion, and the
+tab is an editorial column rather than a dashboard.
+
+**Read `docs/progress-stats-plan.md` before adding a stat to any page.** It
+opens with six binding rules, settled after the page reported a four-word
+library as "saved 0, practiced 2". The core of it: counts come from the `usages`
+event log and never from `SavedWord.status`, which is a single slot that cannot
+say a word is both practiced and used. Overlapping counts are never drawn as a
+stacked bar. Nothing is reported that the app cannot observe — which is why
+`understood` and `owned` were retired, and why a self-reported check-in tap is
+always labeled "marked used".
 
 ## Phase 4 — Capture paths
 

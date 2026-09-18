@@ -11,27 +11,37 @@
  */
 
 /**
- * How far a word has travelled from "seen once" to "mine".
+ * A word's furthest recorded state. **Not a progression, and not what any
+ * screen counts.**
  *
- * The progression is the app's core idea: a vocabulary is not what you can
- * define, it is what you actually reach for. `used` and `owned` are therefore
- * the only two states that mean anything — everything before them is prologue.
+ * This was written as a five-step ramp from "seen once" to "mine", and that
+ * model does not survive contact with the questions the app actually asks. Two
+ * problems, both structural:
  *
- * - `spotted`     saved, not yet read properly
- * - `understood`  the definition has landed
- * - `rehearsed`   practised, but only inside the app
- * - `used`        said or written it in the wild at least once
- * - `owned`       used it more than once, unprompted
+ * 1. **It is one slot.** A word can be saved *and* practiced *and* used — all
+ *    three simultaneously true, none cancelling the others. A single value
+ *    cannot hold that, so writing `rehearsed` erased the fact that the word was
+ *    saved, and writing `used` erased that it was practiced. Counting words by
+ *    status therefore reported a four-word library as "saved 0, practiced 2",
+ *    both of which were false.
+ * 2. **Two of the five were never observable.** Nothing in the app could set
+ *    `understood` — there is no screen where a reader says they understand a
+ *    word. And `owned` only ever meant the check-in button had been tapped a
+ *    second time, which records *returning to practice*, not using a word
+ *    twice.
+ *
+ * **So counts come from the `usages` log instead** — an append-only record of
+ * events, where each question ("ever practiced?", "ever used?") is asked
+ * independently and can be true at once. See `libraryTotals` in
+ * `domain/progress.ts`.
+ *
+ * What this field is still good for: `used` is the one value a reader genuinely
+ * reports, so it remains the answer to "has this word been used" for a single
+ * word. The other four are legacy. They stay in the type because words already
+ * in the library are sitting on them, and dropping a stored value costs a
+ * migration for no gain.
  */
 export type WordStatus = 'spotted' | 'understood' | 'rehearsed' | 'used' | 'owned'
-
-export const WORD_STATUSES: readonly WordStatus[] = [
-  'spotted',
-  'understood',
-  'rehearsed',
-  'used',
-  'owned',
-]
 
 /** How a word got into the library. Kept so capture paths can be compared. */
 export type CaptureSource = 'manual' | 'share' | 'paste' | 'import'
@@ -69,6 +79,11 @@ export interface SavedWord {
   word: string
   addedAt: number
   updatedAt: number
+  /**
+   * The word's furthest recorded state. Read `WordStatus` before using this —
+   * it is a single slot and cannot say a word is both practiced and used, so
+   * **counts belong to the `usages` log, not to this field.**
+   */
   status: WordStatus
 
   /* Dictionary payload -------------------------------------------------- */
@@ -174,7 +189,13 @@ export interface Encounter {
 }
 
 /**
- * A time the word was actually used, in the wild or in practice.
+ * One recorded event for a word: a drill answered, or a use reported.
+ *
+ * **This log, not `WordStatus`, is what every count is derived from.** It is
+ * append-only, so each question can be asked of it independently — "has this
+ * word ever been practiced" and "has it ever been used" are both answerable at
+ * once, which a single status field cannot express. See `libraryTotals` in
+ * `domain/progress.ts`.
  *
  * Separate from the FSRS card because recall and usage are different signals.
  * Keeping the log independent means practice can be graded on usage without
@@ -186,7 +207,17 @@ export interface Usage {
   at: number
   /** What was actually said or written, when it is worth keeping. */
   sentence?: string
-  /** `wild` is unprompted use; `practice` came from a prompt in the app. */
+  /**
+   * `practice` is a drill answered correctly inside the app. `wild` is the
+   * reader reporting, on the check-in, that they said or wrote the word for
+   * real.
+   *
+   * **`wild` is self-reported and the app cannot verify it.** So a count of
+   * `wild` rows is a count of times the button was tapped, not of times the
+   * word was spoken — which is why anything built on it must say "marked used"
+   * rather than "used N times". The honest unit is *how many distinct words*
+   * have been marked, not how many taps happened.
+   */
   kind: 'wild' | 'practice'
 }
 
@@ -214,13 +245,25 @@ export interface Collection {
   note?: string
 }
 
-/** STUB — a completed practice or puzzle run, for streaks and history. */
+/**
+ * A completed practice run. One row per session, written when it ends.
+ *
+ * This is what streaks are counted from, so it is deliberately a record of
+ * *what happened* rather than a score: `correct`/`total` are the drills the
+ * reader actually answered, not the drills the queue offered. A session left
+ * halfway is not written at all — an abandoned run is not a day of practice.
+ */
 export interface PracticeSession {
   id: string
   startedAt: number
   endedAt: number
-  /** `recall` today; puzzle modes join this union as they are built. */
-  mode: 'recall' | 'usage'
+  /**
+   * `mixed` is what Practice builds today — recall drills and usage check-ins
+   * in one run, so neither `recall` nor `usage` describes it honestly. The
+   * narrower two are kept for the puzzle modes that will sit beside it.
+   */
+  mode: 'mixed' | 'recall' | 'usage'
+  /** Every word the session touched, whether or not its drills were answered. */
   wordIds: string[]
   correct: number
   total: number

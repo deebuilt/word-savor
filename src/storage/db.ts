@@ -21,9 +21,11 @@ import type {
  * Everything is local. There is no account and no server, so the database IS
  * the app's state — which is why `backup.ts` exists beside it.
  *
- * All six stores are created at version 1, including the three nothing reads
- * yet. An empty store costs nothing; adding one later means a version bump
- * against a database that already holds a year of someone's words.
+ * All six stores are created at version 1, including the ones nothing read yet.
+ * An empty store costs nothing; adding one later means a version bump against a
+ * database that already holds a year of someone's words. `sessions` is the
+ * argument paying off — it was created empty at version 1 and Progress now
+ * reads it, with no migration and no backfill.
  */
 
 const DB_NAME = 'wordsavor'
@@ -61,7 +63,7 @@ interface WordSavorDB extends DBSchema {
     key: string
     value: Collection
   }
-  /** STUB — practice and puzzle history, for streaks. */
+  /** Practice history. Progress counts streaks from this. */
   sessions: {
     key: string
     value: PracticeSession
@@ -215,10 +217,107 @@ export async function addUsage(usage: Usage): Promise<void> {
   await tx.done
 }
 
+/**
+ * Record a usage check-in: the word's new state and its use, atomically.
+ *
+ * This exists because doing it as `saveWord` then `addUsage` is a **lost
+ * update**. Those are two transactions, and `addUsage` re-reads the word to bump
+ * its counters — so it can read the version from *before* the status was
+ * written and put it back, silently reverting `used` to whatever it was. The
+ * symptom is a word with a logged use whose status never moved, which is
+ * exactly the disagreement between "used 1" and "words marked used 2".
+ *
+ * One transaction over both stores, with the word written once from a single
+ * read, so there is no window for a second reader to lose the change.
+ */
+export async function recordUsageCheckIn(
+  word: SavedWord,
+  changes: Pick<SavedWord, 'status' | 'fsrs'>,
+  usage?: Usage,
+): Promise<void> {
+  const db = await getDB()
+  const tx = db.transaction(['usages', 'words'], 'readwrite')
+
+  if (usage) await tx.objectStore('usages').put(usage)
+
+  await tx.objectStore('words').put({
+    ...word,
+    status: changes.status,
+    fsrs: changes.fsrs,
+    // Counters move only when a use was actually logged.
+    usageCount: usage ? word.usageCount + 1 : word.usageCount,
+    lastUsedAt: usage ? usage.at : word.lastUsedAt,
+    updatedAt: Date.now(),
+  })
+
+  await tx.done
+}
+
 export async function listUsages(wordId: string): Promise<Usage[]> {
   const db = await getDB()
   const found = await db.getAllFromIndex('usages', 'by-word', wordId)
   return found.sort((a, b) => b.at - a.at)
+}
+
+/**
+ * Every use across the whole library, newest first.
+ *
+ * Read from `by-date` rather than by walking each word's usages, because the
+ * question Progress asks is "what happened lately", which is a date range and
+ * not a word. `since` bounds the read at the index so a year of practice does
+ * not have to be loaded to count this week's.
+ */
+export async function listUsagesSince(since: number): Promise<Usage[]> {
+  const db = await getDB()
+  const found = await db.getAllFromIndex('usages', 'by-date', IDBKeyRange.lowerBound(since))
+  return found.sort((a, b) => b.at - a.at)
+}
+
+/**
+ * Every use ever recorded, newest first.
+ *
+ * Unbounded, because the questions it answers are lifetime ones: whether a word
+ * has *ever* been practiced or used. A bounded read would make a word practiced
+ * last month look untouched, which is the opposite of what "has this been
+ * practiced" means.
+ *
+ * One row per drill answered, so this grows faster than any other store. It is
+ * still small in absolute terms — a year of daily practice is a few thousand
+ * rows of four fields — and it is read once per Progress mount, not per render.
+ */
+export async function listAllUsages(): Promise<Usage[]> {
+  const db = await getDB()
+  const found = await db.getAllFromIndex('usages', 'by-date')
+  return found.reverse()
+}
+
+/* Sessions ----------------------------------------------------------------- */
+
+/**
+ * Record a finished practice run.
+ *
+ * Written once, at the moment the session ends, and never updated — a session
+ * is a historical fact. This is the row every streak is counted from, so a
+ * session that is not written here did not happen as far as Progress is
+ * concerned.
+ */
+export async function addSession(session: PracticeSession): Promise<void> {
+  const db = await getDB()
+  await db.put('sessions', session)
+}
+
+/**
+ * Every completed session, newest first.
+ *
+ * Unbounded on purpose: a streak's *longest* run can be anywhere in the
+ * history, so a window would make the headline number wrong the moment the best
+ * streak fell out of it. One row per session is small — a year of daily
+ * practice is a few hundred records.
+ */
+export async function listSessions(): Promise<PracticeSession[]> {
+  const db = await getDB()
+  const found = await db.getAllFromIndex('sessions', 'by-date')
+  return found.reverse()
 }
 
 /* Lookup cache ------------------------------------------------------------- */

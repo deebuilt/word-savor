@@ -1,0 +1,108 @@
+/*
+ * A proportional bar over its own legend.
+ *
+ * Rows rather than chips: chips sized to their own text put a long label at
+ * three times the width of a short one, which reads as a row of tags instead of
+ * a tally. Rows put every count in the same column so the figures can be
+ * compared without measuring them.
+ *
+ * Colors come from the caller. This file owns only the shapes.
+ */
+
+.block {
+  margin: 0;
+}
+
+.bar {
+  display: flex;
+  height: 10px;
+  /* Tight radius. A pill would read as a template progress widget; this is
+     closer to a measured rule. */
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--ws-paper-sunken);
+}
+
+.segment {
+  min-width: 2px;
+  transition: width 320ms ease;
+}
+
+.rows {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+
+.row + .row {
+  border-top: 1px solid var(--ws-line);
+}
+
+.swatch {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--ws-line-strong);
+}
+
+/* `flex: 1` on the label is what pushes every count to a shared right edge. */
+.label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: calc(14px * var(--ws-scale-body));
+  color: var(--ws-ink-soft);
+}
+
+/*
+ * The example word. Set in the word face, because it is a word — the same face
+ * every saved word wears everywhere else in the app — and quiet enough that the
+ * band name still leads.
+ */
+.hint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ws-font-word);
+  font-size: calc(12px * var(--ws-scale-word));
+  font-style: italic;
+  color: var(--ws-ink-faint);
+}
+
+/*
+ * The share, set quieter and right-aligned in its own fixed column so the
+ * percentages line up whether they read 8% or 100%. Secondary to the count: it
+ * is context for the figure, not the figure itself.
+ */
+.share {
+  flex: none;
+  min-width: 36px;
+  text-align: right;
+  font-size: calc(12px * var(--ws-scale-body));
+  font-variant-numeric: tabular-nums;
+  color: var(--ws-ink-faint);
+}
+
+.count {
+  flex: none;
+  /* Fixed width so the counts stay in one column beside a variable share. */
+  min-width: 24px;
+  text-align: right;
+  font-family: var(--ws-font-word);
+  font-size: calc(15px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-medium);
+  /* Tabular figures so the column stays straight at 1 vs 11 vs 111. */
+  font-variant-numeric: tabular-nums;
+  color: var(--ws-ink);
+}
