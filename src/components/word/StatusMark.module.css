@@ -1,56 +1,74 @@
 /*
  * The status mark.
  *
- * A dot, not a chip. Every row in the library carries one, and a row of
- * coloured pills down the right edge would compete with the words themselves —
- * which are the thing worth looking at. A dot reads as a state at a glance and
- * disappears when you are not looking for it.
+ * Two pips, not a chip and not one dot. Every row in the library carries one,
+ * so a row of coloured pills down the right edge would compete with the words
+ * themselves — which are the thing worth looking at. Two small marks read as a
+ * state at a glance and disappear when you are not looking for them.
+ *
+ * **Two pips rather than one.** A single dot encoded three states as a border
+ * colour, which put the whole difference between "saved" and "practiced" into
+ * 1.5px of a tone that is nearly invisible against paper — and it could not
+ * show that the two facts are independent. Two pips make the state a count
+ * before it is a colour: none filled, one filled, both filled.
  */
 
 .mark {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex: none;
 }
 
-.dot {
-  width: 8px;
-  height: 8px;
+.pip {
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
-  /* A ring rather than a fill for the early states — the progression reads as
-     filling in as a word gets closer to being owned. */
-  border: 1.5px solid var(--ws-line-strong);
-  background: transparent;
+  flex: none;
+  border: 1.5px solid transparent;
 }
 
 /*
- * Three marks for two facts.
- *
- * Saved is the absence of both, so it gets the faintest ring; practiced fills
- * the ring in accent; used is solid gold. Not a five-step ramp — the old one
- * implied a progression the app cannot observe.
+ * Not yet earned. A ring rather than nothing, so the filled pip beside it reads
+ * as "one of two" — an absent mark would read as a one-pip design and lose the
+ * fact that there is something still to come.
  */
-
-/* saved: an empty ring. In the library, nothing done to it yet. */
-.saved {
+.empty {
   border-color: var(--ws-line-strong);
+  background: transparent;
 }
 
-/* practiced: been through a drill. */
+/* Practiced: been through a drill. */
 .practiced {
   border-color: var(--ws-accent);
+  background: var(--ws-accent);
 }
 
-/* used: the reader says they said or wrote it. */
+/* Used: the reader says they said or wrote it. */
 .used {
   border-color: var(--ws-gold);
   background: var(--ws-gold);
 }
 
+/* The word's own screen ----------------------------------------------------- */
+
+/*
+ * Said in words rather than shown as a mark.
+ *
+ * On a single word's screen a bare dot is a puzzle — there is no other row to
+ * compare it against, so the colour carries nothing. The pips stay as a visual
+ * anchor tying it to the library rows, with the sentence doing the actual work.
+ */
+.detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
 .label {
+  margin-left: 4px;
   font-family: var(--ws-font-body);
-  font-size: calc(12px * var(--ws-scale-body));
+  font-size: calc(13px * var(--ws-scale-body));
   color: var(--ws-ink-faint);
-  text-transform: lowercase;
 }

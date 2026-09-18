@@ -1,0 +1,17 @@
+/*
+ * The sorted-on figure, under a library row.
+ *
+ * Deliberately the quietest text on the row. It is there to justify the order,
+ * not to be read — the word and its definition are what the eye should land on,
+ * and a meta line competing with them would make the list harder to scan in
+ * exchange for a number nobody came for.
+ */
+.meta {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  line-height: calc(1.4 * var(--ws-leading-body));
+  color: var(--ws-ink-faint);
+  font-variant-numeric: tabular-nums;
+}

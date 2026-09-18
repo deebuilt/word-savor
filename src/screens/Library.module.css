@@ -46,10 +46,60 @@
   margin-bottom: 8px;
 }
 
-/* Letter index ------------------------------------------------------------- */
+/* Controls ----------------------------------------------------------------- */
+
+/*
+ * Filter and sort on one line.
+ *
+ * Wraps rather than scrolling: these are two controls, not a list, and a sort
+ * dropdown that can slide out of view is a control the reader has to go looking
+ * for. The filter takes the space it needs and the sort sits at the end of the
+ * row, dropping below it on a narrow phone.
+ */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/*
+ * The filter segments scroll sideways within their own track, so five options
+ * never force the row taller on a narrow screen.
+ */
+.filters {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filters::-webkit-scrollbar {
+  display: none;
+}
+
+.sort {
+  flex: none;
+  /* Borderless, so it reads as a label that happens to be adjustable rather
+     than a form field competing with the filter beside it. */
+  min-width: 120px;
+}
+
+.median {
+  color: var(--ws-ink-faint);
+}
+
+/* Letter filter ------------------------------------------------------------ */
 
 /*
  * A horizontal strip of the letters in use, above the list.
+ *
+ * **These filter the list rather than scrolling to a heading.** As a jump
+ * control the strip did nothing whenever the library already fit on one screen,
+ * which reads as broken rather than as "nowhere to go". Filtering always
+ * changes what is on screen, and it gives the page a browse control without
+ * adding more chrome.
  *
  * Scrolls sideways rather than wrapping to a second row, so the header height
  * stays constant whether the library holds five letters or twenty-six. The
@@ -97,6 +147,24 @@
   outline-offset: -2px;
 }
 
+/*
+ * The letter being browsed.
+ *
+ * Reversed out rather than merely tinted: this is the one control on the page
+ * that silently hides most of the library, so it has to be unmistakable that it
+ * is on. A faint highlight here would leave a reader wondering where their
+ * words went.
+ */
+.indexActive {
+  background: var(--ws-accent);
+  color: var(--ws-paper);
+}
+
+.indexActive:hover {
+  background: var(--ws-accent);
+  color: var(--ws-paper);
+}
+
 /* Groups ------------------------------------------------------------------- */
 
 .group {
@@ -130,6 +198,11 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* Ungrouped orders have no heading above the first row to space them off it. */
+.flatList {
+  margin-top: 16px;
 }
 
 /* Row ---------------------------------------------------------------------- */

@@ -1,4 +1,4 @@
-import type { SavedWord } from '../types/domain'
+import type { DrillKind, SavedWord } from '../types/domain'
 
 /**
  * Practice modes that drill one saved word using data it already carries —
@@ -19,12 +19,15 @@ import type { SavedWord } from '../types/domain'
  * inventing a distractor or a giveaway blank.
  */
 
-export type DrillKind =
-  | 'definition-match'
-  | 'fill-blank'
-  | 'fragment-cloze'
-  | 'synonym-match'
-  | 'odd-one-out'
+/**
+ * Re-exported from the stored types, where it is defined.
+ *
+ * `DrillResult` writes this string to the database, so its home is beside the
+ * other stored shapes rather than here among the builders that produce them.
+ * Kept exported from this module because every drill below is discriminated on
+ * it, and reading `puzzles.ts` should not mean chasing the union elsewhere.
+ */
+export type { DrillKind }
 
 export interface DefinitionMatchDrill {
   kind: 'definition-match'

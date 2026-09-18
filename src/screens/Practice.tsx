@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
-import type { PracticeSession, SavedWord, WordStatus } from '../types/domain'
+import type { DrillResult, PracticeSession, SavedWord, WordStatus } from '../types/domain'
 // Aliased: the handler below is also called `recordUsageCheckIn`, and the local
 // binding would shadow this import — so the handler would call itself.
 import { addSession, listWords, recordUsageCheckIn as writeCheckIn } from '../storage/db'
@@ -377,6 +377,7 @@ function DrillCardView({
  */
 function finishedSession(session: {
   steps: Step[]
+  history: Map<number, AnsweredStep>
   correct: number
   answered: number
   startedAt: number
@@ -395,7 +396,44 @@ function finishedSession(session: {
     wordIds,
     correct: session.correct,
     total: session.answered,
+    results: drillResults(session.steps, session.history),
   }
+}
+
+/**
+ * The per-drill record for a finished run.
+ *
+ * Walked in step order rather than read out of the history map directly, so the
+ * results come back in the order they were asked — a map keyed by step index
+ * has no order worth relying on, and the sequence is part of what happened.
+ *
+ * **Check-ins are excluded.** A check-in is stored in the same history with
+ * `correct: true`, because that is what makes Back replay it without offering
+ * a re-answer — but it is a self-report, not a question, and folding it in
+ * would pad every word's record with a guaranteed pass it never earned. This
+ * is the same honesty rule the Progress page runs on: a drill is one question,
+ * and only answered questions are results.
+ *
+ * Unanswered steps are simply absent. A drill the reader never reached is not
+ * a miss, and recording it as one would make every session ended early look
+ * like a failed one — the same reasoning that makes `total` count answers
+ * rather than offers.
+ */
+function drillResults(steps: Step[], history: Map<number, AnsweredStep>): DrillResult[] {
+  const results: DrillResult[] = []
+
+  steps.forEach((step, index) => {
+    if (step.kind !== 'drill') return
+    const answered = history.get(index)
+    if (!answered) return
+    results.push({
+      wordId: step.card.word.id,
+      drill: step.card.drill.kind,
+      correct: answered.correct,
+    })
+  })
+
+  return results
 }
 
 /**

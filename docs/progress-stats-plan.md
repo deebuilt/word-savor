@@ -95,10 +95,10 @@ database** — the app has been recording more than it displays since Phase 1.
 | Word status | **Yes**, Phase 1 | `SavedWord.status`, `by-status` index |
 | FSRS schedule and next due date | **Yes**, Phase 2 | `SavedWord.fsrs` |
 | Where a word was encountered | Store exists, **barely written** | `encounters` store |
-| **Per-word drill results** | **No** | — needs a schema decision |
+| **Per-word drill results** | **Yes**, since 2026-09-18 | `PracticeSession.results` |
 
-So: of everything below, only the per-word practice record needs new storage.
-Everything else is a read and a render.
+So: of everything below, only the per-word practice record needed new storage,
+and it now exists. Everything else is a read and a render.
 
 ---
 
@@ -287,8 +287,8 @@ both make it hurt more.
 3. ~~**Uses-over-time trend**~~ — **done 2026-09-17**, replacing the fixed
    seven-day window.
 4. ~~**Words saved per week**~~ — **done 2026-09-17.**
-5. **Library sort and filter** — a bigger piece; a list redesign, not a stat.
-6. **Word-detail history** — needs the per-word practice record designed first.
+5. ~~**Library sort and filter**~~ — **done 2026-09-18.**
+6. ~~**Word-detail history**~~ — **done 2026-09-18.**
 
 ## What shipped — 2026-09-17
 
@@ -330,10 +330,12 @@ of scored words only.
 drills answered rather than averaged across sessions** — a 9-of-10 and a 1-of-10
 is 50%, not 55%. Sessions that answered nothing are skipped, not counted as zero.
 
-**56 tests pass** across two harnesses, covering the week-bucket boundary (day 6
-vs day 7, no double-count and no gap), real measured words landing in their
-documented rarity bands, unscored handling including `NaN`, and the guard that
-no library count can exceed the total.
+**On testing:** an earlier version of this note claimed "56 tests pass across
+two harnesses." There is no test runner in `package.json` and no test file in
+the repository, so that line was wrong and has been removed rather than left to
+promise coverage that does not exist. The logic it described — week-bucket
+boundaries, rarity banding including unscored words, weighted accuracy — is
+still worth covering the day a harness goes in.
 
 ## Two build notes
 
@@ -353,3 +355,243 @@ evidence.
 Every stat above must name what it actually measured. `usageCount` is
 **marked**-used, not used. A stat that cannot be honestly labeled does not go on
 a screen.
+
+---
+
+## What shipped — 2026-09-18
+
+Library sort and filter, the per-word practice record, and Word detail's own
+history. **The Practice page was deliberately left alone** — see the deferral
+note at the end.
+
+### Per-word drill results are now stored
+
+`PracticeSession.results` is written on every finished run. The decision the
+previous session flagged as "settle before building" is settled, and it was
+settled while the session history was one day old — the last point at which it
+cost nothing.
+
+**The shape is wider than this doc proposed.** The plan suggested
+`Array<{ wordId, correct }>`. That is one row per drill with no way to tell the
+rows apart, and a word generates about four drills a session — so a word's
+record would read `true, false, true, true` with no idea whether the miss was
+typed recall or a multiple-choice guess. Those are different facts: failing to
+produce a word from its definition means it is not known, while picking the
+wrong synonym out of four means it is nearly known. The stored shape is
+`Array<{ wordId, drill, correct }>`, and `DrillKind` moved from
+`domain/puzzles.ts` into `types/domain.ts` because it is now a **stored
+vocabulary** — renaming a member silently orphans every result recorded under
+the old name.
+
+`results` is optional. `undefined` means "this session predates per-drill
+recording" and `[]` means "recorded, nothing answered", and every reader must
+tell them apart — which is why `wordPracticeRecord` reports
+`unrecordedSessions` separately rather than counting an old session as a run of
+zero.
+
+**That distinction stays in the data and off the screen.** Word detail briefly
+printed "One earlier session is not counted above; it ran before per-drill
+results were kept." Ruthnie: *"how do you know that if you know that one exists?
+How come it wasn't kept? I don't get it."* Fair — the note was the app
+explaining its own release history to its reader. The `sessions` store has always
+recorded which words a session covered, so the session is known; what was never
+written is which drills were answered, and no later read can recover it. True,
+and not the reader's problem. The figure is still computed, because a future
+screen may have a reason to distinguish "no record" from "record starts here",
+but nothing displays it. Check-ins are excluded from `results`: a check-in is stored in the session
+history with `correct: true` so that Back can replay it, but it is a
+self-report, not a question, and folding it in would pad every word's record
+with a pass it never earned.
+
+### Library
+
+**The letter strip filters instead of jumping.** The jump looked broken and the
+diagnosis that mattered was Ruthnie's: with four words the whole list fits on
+one screen, so `scrollIntoView` had nowhere to go. A filter always does
+something visible, and it gives the page a browse control without adding chrome.
+Tapping the active letter clears it. (A real latent bug was found on the way —
+the headings are `position: sticky`, and a sticky element that is already stuck
+reports its stuck position, so the jump would have under-scrolled even on a long
+list. Moot now that nothing scrolls to them.)
+
+The letters offered are computed from the search and filter results but *before*
+the letter itself applies — computed after, choosing B would leave B as the only
+letter on screen and strand the reader. A letter that stops matching is ignored
+during render rather than reset from an effect, so clearing a search restores the
+browse rather than silently dropping it.
+
+**Five orders, and each one carries its own caption.** Sorting by longest unused
+while showing the date a word was added asks the reader to take the order on
+trust — the row cannot be checked against the reason it is there. So the
+secondary line always shows the value being sorted on, and under alphabetical it
+shows nothing at all, because the order is the word itself.
+
+Two orders needed an explicit decision about missing values, both resolved the
+same way the Progress page resolves them. **Never-used words lead "longest
+unused"** — a word never used has gone the whole way, and sorting `undefined` as
+though it were recent would bury exactly what the order is for. **Unscored words
+sort last under "rarest"** — Datamuse having no frequency is not evidence of
+rarity, and letting an unmeasured word head a list titled "rarest" is the same
+overstatement the rarity spread refuses. Every order falls back to alphabetical
+on a tie, so a library where nothing has been used does not reshuffle on every
+read.
+
+**Collection rarity is the median band**, not the mean frequency. Frequency spans
+four orders of magnitude, so one everyday word dropped into a library of rare
+ones moves a mean across two bands and describes neither.
+
+### The status mark was rebuilt
+
+Ruthnie: *"we have an indicator on our library that I didn't notice. Used in
+practice has a little dot indicator. We need to do better."*
+
+It encoded three states as a **border color on an 8px circle**, so the whole
+difference between "saved" and "practiced" was 1.5px of a tone most people
+cannot pick out — and it could not show that practiced and used are independent.
+It is now **two pips**, so the state is a count before it is a color: none
+filled, one filled, both filled. An unfilled pip stays as a faint ring, because
+"one of two" only reads as partial when the empty half is still visible.
+
+Both predicates moved into `domain/library.ts` and are shared with the filters,
+so a word the "not practiced" filter shows can never render a practiced mark.
+
+### Word detail
+
+A per-word record: drills answered, **split by drill kind and ordered weakest
+first**, because the reason to split at all is to name what to work on. The
+drill kinds are labeled by the task ("Recalling it from its meaning"), never by
+the stored name. `fsrs.due` is shown for the first time since Phase 2.
+
+**Three corrections came from Ruthnie mid-build, all of them right:**
+
+- **It listed every date the word was marked used.** That grows without bound
+  and answers nothing — "Sep 15, Sep 17, Sep 17" makes the reader do arithmetic
+  to recover two facts the app can simply state. Now: the count, and when it
+  last happened. A per-word event log is a different feature.
+- **It sat in the middle of the screen.** Everything above it is the word
+  itself — senses, encounters, synonyms, origin — and that is a continuous read.
+  *"I'm reading, reading, and then oh, numbers."* The section moved below the
+  reference material: the stats are about the reader's relationship with the
+  word, not about the word, so they come after the word has been said in full.
+- **"Comes back round in 28 days"** was a tic, not clarity. Now "Scheduled in 28
+  days."
+
+A due date in the past reads as **ready**, never as overdue. The queue does not
+penalize a late review and neither should the label.
+
+## Deferred — the Practice page needs its own session
+
+Everything on Practice is out of scope until then, by decision rather than
+oversight. The open questions are entangled and none is a stats problem:
+
+- **Session bounding.** *"Yeah, I do, but how?"* is the real question — every
+  word getting its full run of drills makes a 20-word library ~100 steps. The
+  binding is not the hard part; choosing what a session should contain is.
+- **A landing page.** Practice drops straight onto question one. It should open
+  on something that says what the session will be, ideally with the words
+  selectable so the length is known before starting.
+- **No way to skip.** There is no "I don't know this" — the only way past a
+  question is to get it wrong, which corrupts the accuracy figure with answers
+  nobody meant.
+- **Where results are displayed.** `results` is being recorded now, and Word
+  detail reads it, but there is no session-level view of it. That view belongs
+  on Practice, behind the landing page that does not exist yet.
+
+**These push on the router question.** A landing page, a session view, and a
+results view are three destinations inside one tab that local state cannot
+address. Ruthnie: *"we have literally no routing, so I don't know how you want
+to do that."* Still not blocking, but it is now the second plan to name it.
+
+**The library can feed that landing page.** The sort and filter built here —
+longest unused, not practiced, going cold — are the same selections a
+pre-session word picker needs. That is why this went first.
+
+## Rule 7 — a stat must not imply a rule the app does not enforce
+
+Added 2026-09-18, after `fsrs.due` was shown and then cut the same session.
+
+Word detail briefly printed "Scheduled in 28 days" from the stored FSRS due
+date. Two things were wrong with it, and the second is the one worth keeping as
+a rule.
+
+**It described a gate that does not exist.** The Practice queue puts *every*
+word in the library into *every* session regardless of `fsrs.due` — nothing
+reads the due date to exclude anything. So the line announced a schedule the app
+does not keep. A figure that describes behavior the code does not have is worse
+than no figure, because it will be believed.
+
+**And the behavior it implied is one the app should not have.** Ruthnie:
+*"we shouldn't hold a word back. You need repetition... I want a choice. I don't
+want it to be enforced that I can't grab the word."* That is the right call and
+it matches how spaced repetition is actually implemented everywhere — Anki and
+SuperMemo both surface what is *due* while letting the reader drill anything at
+any time. The schedule is a suggestion about what to review, never a lock on
+what may be reviewed. A vocabulary app that refuses to practice a word its owner
+asked for has mistaken its own bookkeeping for the goal.
+
+Worth separating from a real point about intervals: expanding gaps are not a
+bug. Recalling something just before you would have forgotten it is what builds
+retention, which is why a correct answer pushes the next review out. That part
+of FSRS is sound. But the intervals here are also probably not calibrated — FSRS
+derives them from difficulty and stability parameters that have almost no
+history to work from on a four-word library, so 28 days is extrapolation. Both
+questions belong to the Practice session; neither changes the rule above.
+
+**The rule:** before putting a scheduling or ranking figure on a screen, check
+that something in the code acts on it. If nothing does, it is a plan, not a
+stat, and it does not go on a screen yet.
+
+---
+
+## Amendment to "What shipped — 2026-09-18"
+
+Two things below the Word detail notes above were changed later the same
+session, after Ruthnie saw them on screen.
+
+**The due line is gone entirely.** See rule 7 above. `fsrs.due` is still stored
+and the scheduler still maintains it; nothing displays it.
+
+**The record section is figures, not prose.** It shipped as two grey sentences
+at the foot of a screen that already carries a word's senses, synonyms,
+opposites and related terms. Ruthnie: *"it doesn't look like new information...
+visually it's not really doing much"* and *"if you put numbers and labels, just
+like the way our progress page is, that's visually catching."* Right on both
+counts — the section was not earning its space.
+
+It now uses the **same label-left, figure-right rows as Progress**, with the
+figures set in the word face. Matching rather than inventing a layout means
+there is one way to read a number anywhere in the app. Rows: marked used, frequency,
+last marked used, drills correct, practiced in — then the per-drill breakdown as
+a second level, weakest first. The "earlier sessions" note dropped to fine
+print, because it is a footnote about the data rather than a figure about the
+word.
+
+**"Frequency" is new, and it replaced the date list.** The first version listed
+every date a word was marked used, which grows without bound and answers
+nothing. Ruthnie: *"a pattern would be cool. Every X days, something like that."*
+So: the **median** gap between marks, in days. Median rather than mean because
+one long silence — three marks in a week, then nothing for four months — drags a
+mean to a number describing neither the burst nor the gap.
+
+It appears only at **four or more marks** (`MIN_MARKS_FOR_INTERVAL`). Four marks
+give three gaps; two marks give one gap, and calling a single interval "every 9
+days" presents one occurrence as a rhythm. Same rule as never reporting a
+percentage from one sample.
+
+**A note on writing, for anyone adding copy here.** Three labels had to be
+fixed in one session, all the same failure — writing around the thing instead of
+naming it.
+
+- *"You reach for this one about every 9 days."* Nobody reaches for a word, and
+  the app already has a verb for this: **practice**. Use the terms already on
+  the UI.
+- *"Comes back round in 28 days."* Says nothing about what comes back, or from
+  where. (That line is gone for other reasons — see rule 7 — but the wording was
+  wrong before the concept was.)
+- *"Last marked."* Marked **what**? Every other label in the app says "marked
+  used", because that is the fact being counted. A label that drops its object
+  to save a word makes the reader supply it.
+
+Say literally what is meant, name the object, and prefer a label and a figure to
+a sentence. This screen carries more prose than any other in the app — every
+sentence added here is one more thing to skip past.

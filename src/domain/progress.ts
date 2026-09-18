@@ -1,4 +1,4 @@
-import type { PracticeSession, SavedWord, Usage } from '../types/domain'
+import type { DrillKind, PracticeSession, SavedWord, Usage } from '../types/domain'
 import { BANDS, rarityBand, type RarityBand } from './rarity'
 
 /**
@@ -424,4 +424,161 @@ export function summariseWeek(
     sessions: recentSessions.length,
     accuracy: answered === 0 ? undefined : correct / answered,
   }
+}
+
+/* One word's practice record ------------------------------------------------ */
+
+export interface DrillKindRecord {
+  drill: DrillKind
+  correct: number
+  answered: number
+}
+
+export interface WordPracticeRecord {
+  /** Drills answered for this word, across every session that recorded them. */
+  answered: number
+  correct: number
+  /** Correct over answered, or `undefined` when nothing was answered. */
+  accuracy: number | undefined
+  /** How many sessions this word was actually drilled in. */
+  sessions: number
+  /** When it was last drilled, or `undefined` if never. */
+  lastPracticedAt: number | undefined
+  /** The breakdown by kind of question, strongest first. Empty kinds are omitted. */
+  byKind: DrillKindRecord[]
+  /**
+   * Sessions that covered this word but predate per-drill recording.
+   *
+   * Reported so the screen can say the record is partial rather than quietly
+   * showing a word as less practiced than it is. See `PracticeSession.results`.
+   */
+  unrecordedSessions: number
+}
+
+/**
+ * How one word has actually gone in practice.
+ *
+ * Derived from the session log rather than from any counter on the word, for
+ * the reason every other figure here is: a stored tally drifts the moment a
+ * session is restored or deleted, and nothing can detect that it has.
+ *
+ * **The breakdown by drill kind is the point.** An aggregate "7 of 10" says a
+ * word is mostly known and nothing more. Split by kind it can say the reader
+ * produces the word from its definition every time but misses the synonym
+ * match — which names what to work on, where the aggregate only scores it.
+ *
+ * Sessions recorded before per-drill results existed are counted separately
+ * rather than skipped silently. A word practiced ten times last month and
+ * showing "never practiced" would be worse than saying the record starts partway
+ * through.
+ */
+export function wordPracticeRecord(
+  wordId: string,
+  sessions: PracticeSession[],
+): WordPracticeRecord {
+  const counts = new Map<DrillKind, { correct: number; answered: number }>()
+  let answered = 0
+  let correct = 0
+  let sessionCount = 0
+  let unrecordedSessions = 0
+  let lastPracticedAt: number | undefined
+
+  for (const session of sessions) {
+    if (session.results === undefined) {
+      // Predates per-drill recording. It covered the word if `wordIds` says so,
+      // but which drills were answered is gone and cannot be recovered.
+      if (session.wordIds.includes(wordId)) unrecordedSessions++
+      continue
+    }
+
+    const mine = session.results.filter((result) => result.wordId === wordId)
+    if (mine.length === 0) continue
+
+    sessionCount++
+    if (lastPracticedAt === undefined || session.endedAt > lastPracticedAt) {
+      lastPracticedAt = session.endedAt
+    }
+
+    for (const result of mine) {
+      answered++
+      if (result.correct) correct++
+      const tally = counts.get(result.drill) ?? { correct: 0, answered: 0 }
+      tally.answered++
+      if (result.correct) tally.correct++
+      counts.set(result.drill, tally)
+    }
+  }
+
+  /*
+   * Ordered by how well the word is known in each kind, weakest first, so the
+   * drill that needs work leads. Ties break on volume — more answers is the
+   * more settled figure — and then on the kind's name so the order is stable
+   * between renders rather than dependent on Map insertion.
+   */
+  const byKind = [...counts.entries()]
+    .map(([drill, tally]) => ({ drill, correct: tally.correct, answered: tally.answered }))
+    .sort((a, b) => {
+      const rateA = a.correct / a.answered
+      const rateB = b.correct / b.answered
+      if (rateA !== rateB) return rateA - rateB
+      if (a.answered !== b.answered) return b.answered - a.answered
+      return a.drill.localeCompare(b.drill)
+    })
+
+  return {
+    answered,
+    correct,
+    accuracy: answered === 0 ? undefined : correct / answered,
+    sessions: sessionCount,
+    lastPracticedAt,
+    byKind,
+    unrecordedSessions,
+  }
+}
+
+/* How often a word is marked used ------------------------------------------- */
+
+/**
+ * The fewest marks that can show an interval.
+ *
+ * Four marks give three gaps. Two marks give one gap, and calling a single
+ * interval "every 9 days" presents one occurrence as a rhythm — the same
+ * overstatement as reporting a percentage from one sample. Three gaps is the
+ * least that can show whether the spacing is consistent at all.
+ */
+export const MIN_MARKS_FOR_INTERVAL = 4
+
+/**
+ * The typical gap between marks, in days, or `undefined` when there are too few.
+ *
+ * The **median** gap rather than the mean. One long silence — a word marked
+ * three times in a week, then again four months later — drags a mean to a
+ * number that describes neither the burst nor the gap. The median names the
+ * typical spacing, which is what "how often" is asking.
+ *
+ * Returns `undefined` below `MIN_MARKS_FOR_INTERVAL`, so the caller omits the
+ * figure rather than printing a rhythm the data has not earned.
+ */
+export function markedInterval(usages: Usage[]): number | undefined {
+  const marks = usages
+    .filter((usage) => usage.kind === 'wild')
+    .map((usage) => usage.at)
+    .sort((a, b) => a - b)
+
+  if (marks.length < MIN_MARKS_FOR_INTERVAL) return undefined
+
+  const gaps: number[] = []
+  for (let index = 1; index < marks.length; index++) {
+    gaps.push((marks[index] - marks[index - 1]) / (24 * 60 * 60 * 1000))
+  }
+
+  gaps.sort((a, b) => a - b)
+  const middle = gaps[Math.floor((gaps.length - 1) / 2)]
+
+  /*
+   * Rounded to whole days, with a floor of one. Several marks on the same day
+   * produce a median of zero, and "every 0 days" is not a sentence — at that
+   * spacing the honest answer is that it is being marked daily or faster.
+   */
+  return Math.max(1, Math.round(middle))
 }

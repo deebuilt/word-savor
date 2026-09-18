@@ -1,0 +1,108 @@
+/*
+ * One word's record.
+ *
+ * Label left, figure right, matching the Progress page exactly. This screen
+ * already carries a word's senses, synonyms, opposites and related terms, so a
+ * section written as prose reads as more of the same and gets skipped. Figures
+ * in a column can be scanned in a second, and using the same rows as Progress
+ * means there is one way to read a number anywhere in the app.
+ *
+ * No bars. These figures are not parts of a whole and not comparable to each
+ * other — "4 of 6" on one drill beside "2 of 2" on another have different
+ * denominators, and a bar would invite a comparison the numbers cannot support.
+ */
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Stat rows ---------------------------------------------------------------- */
+
+.stats {
+  margin: 0;
+  padding: 0;
+}
+
+.stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+}
+
+.stat + .stat {
+  border-top: 1px solid var(--ws-line);
+}
+
+.statLabel {
+  min-width: 0;
+  font-family: var(--ws-font-body);
+  font-size: calc(14px * var(--ws-scale-body));
+  color: var(--ws-ink-soft);
+}
+
+/*
+ * The figure, in the word face.
+ *
+ * Same treatment as Progress: the word face is what makes a number read as a
+ * finding rather than as body text, and it is the whole reason this section now
+ * holds its own against the chips above it.
+ */
+.statValue {
+  flex: none;
+  margin: 0;
+  font-family: var(--ws-font-word);
+  font-size: calc(17px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-medium);
+  /* Tabular so the figures line up down the right edge. */
+  font-variant-numeric: tabular-nums;
+  color: var(--ws-ink);
+}
+
+/* Per-drill breakdown ------------------------------------------------------ */
+
+.kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/*
+ * A second level inside the section, so the per-drill rows read as a breakdown
+ * of the figures above rather than as five more unrelated numbers.
+ */
+.kindsTitle {
+  margin: 0;
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}
+
+/* The reader's own words --------------------------------------------------- */
+
+/* Set apart as a quotation, because it is the only text in this section that is
+   theirs rather than the dictionary's or the app's. */
+.sentence {
+  margin: 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--ws-line-strong);
+  font-size: calc(14px * var(--ws-scale-body));
+  line-height: calc(1.45 * var(--ws-leading-body));
+  color: var(--ws-ink-soft);
+}
+
+/* Empty state -------------------------------------------------------------- */
+
+.none {
+  margin: 0;
+  max-width: 44ch;
+  font-size: calc(13px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  color: var(--ws-ink-faint);
+}

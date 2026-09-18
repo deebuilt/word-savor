@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Modal, Tag, message } from 'antd'
 import { ArrowLeftOutlined, SoundOutlined } from '@ant-design/icons'
-import type { Encounter, SavedWord } from '../types/domain'
-import { deleteWord, getWord, listEncounters, saveWord } from '../storage/db'
+import type { Encounter, SavedWord, Usage } from '../types/domain'
+import {
+  deleteWord,
+  getWord,
+  listEncounters,
+  listSessions,
+  listUsages,
+  saveWord,
+} from '../storage/db'
 import { lookupWord, toSavedWord, type LookupResult } from '../api/lookup'
 import { rarityLabel } from '../domain/rarity'
+import { wordPracticeRecord, type WordPracticeRecord } from '../domain/progress'
 import { Word } from '../components/word/Word'
 import { SenseList } from '../components/word/SenseList'
 import { StatusMark } from '../components/word/StatusMark'
+import { WordHistory } from '../components/word/WordHistory'
 import { RelatedWordCard } from '../components/word/RelatedWordCard'
 import styles from './WordDetail.module.css'
 
@@ -56,6 +65,18 @@ export function WordDetail({
   const [word, setWord] = useState<SavedWord | undefined>(undefined)
   const [encounters, setEncounters] = useState<Encounter[]>([])
   /**
+   * This word's own record: every use logged for it, and how its drills have
+   * gone.
+   *
+   * Read alongside the word rather than from a counter on it, for the reason
+   * every other figure in the app is derived: a stored tally drifts the first
+   * time a session is deleted or a backup restored, and nothing can tell that
+   * it has. Only loaded for a saved word — a live preview of an unsaved one has
+   * no history by definition.
+   */
+  const [usages, setUsages] = useState<Usage[]>([])
+  const [record, setRecord] = useState<WordPracticeRecord | undefined>(undefined)
+  /**
    * A word not (yet) in the library, shown from a live lookup.
    *
    * Opening a related word's detail must not save it — only a tap on Save may
@@ -83,12 +104,19 @@ export function WordDetail({
     let cancelled = false
 
     void (async () => {
-      const [found, met] = await Promise.all([getWord(wordId), listEncounters(wordId)])
+      const [found, met, used, sessions] = await Promise.all([
+        getWord(wordId),
+        listEncounters(wordId),
+        listUsages(wordId),
+        listSessions(),
+      ])
       if (cancelled) return
 
       if (found) {
         setWord(found)
         setEncounters(met)
+        setUsages(used)
+        setRecord(wordPracticeRecord(wordId, sessions))
         setLoading(false)
         return
       }
@@ -239,7 +267,23 @@ export function WordDetail({
             <span className={styles.pronunciation}>{shown.pronunciation}</span>
           )}
           {shown.audioUrl && <AudioButton src={shown.audioUrl} word={shown.word} />}
-          {rarity && <span className={styles.rarity}>{rarity}</span>}
+          {rarity && (
+            /* The band, with the frequency behind it on hover rather than on
+               screen. "0.109 per million" is unreadable without a scale the
+               reader does not have, and the band is the fact worth showing —
+               but the measurement is what the band is claiming, so it stays
+               reachable rather than hidden. */
+            <span
+              className={styles.rarity}
+              title={
+                word?.rarity !== undefined
+                  ? `About ${formatFrequency(word.rarity)} per million words`
+                  : undefined
+              }
+            >
+              {rarity}
+            </span>
+          )}
         </div>
       </div>
 
@@ -300,6 +344,27 @@ export function WordDetail({
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Origin</h2>
           <p className={styles.etymology}>{shown.etymology}</p>
+        </section>
+      )}
+
+      {/*
+        This word's own record, and it goes last on purpose.
+
+        Everything above is the word itself — its senses, where it was met, its
+        synonyms and origin. That is a continuous read, and dropping a block of
+        numbers into the middle of it interrupts exactly the part of the screen
+        someone came here for. The stats are about the reader's relationship
+        with the word rather than about the word, so they sit after the word has
+        been said in full.
+
+        Only for a saved word — a live preview of one that has not been kept has
+        no history, and "nothing recorded yet" under it would be answering a
+        question nobody asked.
+      */}
+      {word && record && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Your record</h2>
+          <WordHistory record={record} usages={usages} />
         </section>
       )}
 
@@ -405,6 +470,18 @@ function AudioButton({ src, word }: { src: string; word: string }) {
       <SoundOutlined />
     </button>
   )
+}
+
+/**
+ * A frequency, at a readable number of digits.
+ *
+ * Frequencies in this app span four orders of magnitude — "run" is 96 per
+ * million and "sesquipedalian" is 0.0085 — so a fixed number of decimal places
+ * either rounds the rare words to zero or prints the common ones to a precision
+ * the source does not support. Significant digits track the scale instead.
+ */
+function formatFrequency(frequency: number): string {
+  return frequency >= 1 ? frequency.toFixed(1) : frequency.toPrecision(2)
 }
 
 /**

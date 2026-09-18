@@ -246,6 +246,48 @@ export interface Collection {
 }
 
 /**
+ * One kind of question a drill can ask.
+ *
+ * Defined here rather than in `domain/puzzles.ts`, where the drills themselves
+ * are built, because `DrillResult` below stores it — and a stored shape must
+ * not depend on the module that happens to construct it today. `puzzles.ts`
+ * re-exports this as its own `DrillKind` so the builders keep reading naturally.
+ *
+ * **These strings are written to the database**, so renaming one silently
+ * orphans every result already recorded under the old name. Treat them as a
+ * stored vocabulary, not as internal labels.
+ */
+export type DrillKind =
+  | 'definition-match'
+  | 'fill-blank'
+  | 'fragment-cloze'
+  | 'synonym-match'
+  | 'odd-one-out'
+
+/**
+ * One drill, answered.
+ *
+ * **Why the drill kind is stored and not just the word and the verdict.** A
+ * word generates about four drills a session, so recording only
+ * `{ wordId, correct }` produces four rows that cannot be told apart — a
+ * word's record reads `true, false, true, true` with no way to know whether
+ * the miss was typed recall or a multiple-choice guess. Those are different
+ * facts: failing to produce a word from its definition means it is not known,
+ * while picking the wrong synonym out of four means it is nearly known. A
+ * per-word practice record that cannot separate them is a coin-flip log.
+ *
+ * Stored on the session rather than on the word, for the same reason every
+ * other count is: a word holding its own tally is a running counter that drifts
+ * the first time a session is restored from a backup, with no way to notice.
+ * The session log is what happened, and per-word figures are derived from it.
+ */
+export interface DrillResult {
+  wordId: string
+  drill: DrillKind
+  correct: boolean
+}
+
+/**
  * A completed practice run. One row per session, written when it ends.
  *
  * This is what streaks are counted from, so it is deliberately a record of
@@ -267,4 +309,18 @@ export interface PracticeSession {
   wordIds: string[]
   correct: number
   total: number
+  /**
+   * Every drill answered in this run, in the order they were answered.
+   *
+   * Optional because sessions recorded before 2026-09-18 do not have it, and
+   * that absence is not the same as an empty run. `undefined` means "this
+   * session predates per-drill recording"; `[]` means "recorded, and nothing
+   * was answered." A per-word history must not report an old session as a run
+   * of zero results, so every reader has to tell the two apart.
+   *
+   * Not backfillable. A finished session never stored which word failed which
+   * drill, and no later read can recover it — which is why this went in while
+   * the history was still one day old.
+   */
+  results?: DrillResult[]
 }
