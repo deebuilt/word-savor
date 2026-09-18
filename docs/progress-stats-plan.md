@@ -904,3 +904,108 @@ as a scored session.
 
 Words with no `audioUrl` are excluded from the mode, not shown silent. Merriam
 does not have audio for everything.
+
+
+---
+
+# Session A — the router: what shipped, 2026-09-18
+
+Built as specified under "Fork 3 — the router: RESOLVED". The app's five tabs
+and the word stack are real routes; Practice was not touched beyond the props
+it already took, so Session B inherits routing rather than being rewritten
+around it.
+
+## What the addresses are
+
+| Path | Screen |
+| --- | --- |
+| `/` | redirects to `/library` |
+| `/library` | the collection |
+| `/library/:wordId` | one word |
+| `/lookup` | capture |
+| `/practice` | the drill session |
+| `/progress` | the record |
+| `/more` | appearance |
+| `/share` | share-target entry; redirects to `/lookup` |
+| anything else | redirects to `/library` |
+
+`/` redirects rather than being an index route so each screen has exactly one
+address — otherwise the active-tab rule would have to know that two paths mean
+Library. The catch-all redirects rather than rendering a 404: an unknown path in
+an installed PWA is a stale bookmark, and a dead end is worse than the home
+screen.
+
+## The three decisions worth keeping
+
+**The word stack is the browser's history now.** `App.tsx` held an array of open
+word ids and popped it on Back. Pushing `/library/:wordId` per word gives the
+same trail, and gives it to the *device's* back gesture as well — previously the
+gesture knew nothing about the stack, so on an installed PWA it closed the app
+from three words deep. The on-screen button, the hardware button, and the
+gesture are now one behaviour.
+
+The back button's label — "sagacious" rather than "Library" — needs the word
+*beneath* this one, which is not recoverable from the URL. It travels in history
+state (`{ from }`), which is where a fact about how a screen was reached
+belongs: it survives Back and Forward because the browser restores the entry
+with it, and a cold deep link simply has none, which is correct because Back
+really does mean Library there.
+
+**`/share` is a route, and the capture is read per navigation.** It used to be
+read once at module load into a constant, with `clearShareUrl` rewriting the URL
+so a refresh would not replay it. Both jobs are the router's now: the address is
+the tab, and `replace` is the whole of "do not leave this in history".
+
+This also fixed a latent bug nobody had hit: the module-load read happened once
+per *page* load, so a second share into an already-running app was invisible —
+and an installed PWA is exactly the case where the app is already running.
+`readSharedCapture` now takes a query string instead of reading `window.location`,
+and `clearShareUrl` is gone.
+
+**Cross-screen refresh moved to context.** The three counters (`libraryToken`,
+`progressToken`, due count) were shell state threaded down as props. A route
+element takes no props from whatever decided to render it, so they live in
+`RefreshProvider` and screens read them through `useRefresh`. Still tokens
+rather than the data itself: each screen owns its own query, and a token says
+only "what you have is stale".
+
+The context and hook sit in `refreshContext.ts`, separate from the provider in
+`refresh.tsx`, so each file exports only one kind of thing — a module exporting
+both a component and a function loses fast refresh for everything in it.
+
+## What did not get fixed, and this matters for Session B
+
+**Leaving Practice mid-session still loses the session.** The router was called
+"half its answer" above, and that was right — the other half is still Session B.
+React Router unmounts the old route's element on navigation exactly as the
+conditional render did. What routing bought is that Practice now has an
+*address* to return to; the in-progress state still dies on the way out.
+
+So fork 2's three items stand unchanged and are still the work: incremental
+session writes, a quit confirm, and storing the session id and step index so
+reopening can offer to resume. Do not treat the tab-switch bug as closed.
+
+## Notes for whoever builds Practice
+
+`/practice` is deliberately still one route. The landing page, the session, the
+end screen, and the results view belong under it as children — adding those
+addresses before the screens exist would be guessing at their shape. The point
+of doing this first is that they can be added to the route table when built,
+rather than as a fifth kind of state inside the screen.
+
+## Housekeeping
+
+- **`react-router` v8.4.0**, not `react-router-dom` — since v7 the base package
+  exports the DOM APIs and the `-dom` package is redundant.
+- **One engine warning on install:** v8 wants Node >= 22.22.0 and this machine
+  runs 22.18.0. It is advisory — npm warns and proceeds, and the router's own
+  code runs in the browser, so Node only matters to the build process. Worth a
+  Node bump when convenient; not worth pinning to v7 to silence.
+- `App.tsx` is gone. The shell is `app/Shell.tsx`, `App.module.css` moved to
+  `app/Shell.module.css`, and `More` became a real screen in `screens/More.tsx`
+  — it was defined inside the shell, which the router cannot point at.
+- Deep links already work on both hosts: `vercel.json` rewrites everything to
+  `index.html`, and the Vite `spaFallback` plugin copies it to `404.html` for
+  GitHub Pages. No host config was needed.
+- Typecheck and lint are clean. The four remaining oxlint warnings are the
+  pre-existing `set-state-in-effect` pattern (async read on mount).

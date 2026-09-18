@@ -61,7 +61,15 @@ const ITEMS: readonly BarItem[] = [
 ]
 
 interface BottomBarProps {
-  active: TabKey
+  /**
+   * The destination showing, or `undefined` where none is.
+   *
+   * Optional because the app has one address that is not a destination:
+   * `/share`, the share-target entry point, which reads its parameters and
+   * redirects. For the render before that redirect lands, no item is current —
+   * which is the truth, and better than lighting one up for a frame.
+   */
+  active?: TabKey
   onSelect: (tab: TabKey) => void
   /**
    * How many words are due. Shown on Practice so the queue is visible without

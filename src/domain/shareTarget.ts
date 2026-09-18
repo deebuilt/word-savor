@@ -6,15 +6,19 @@
  * selection in the query string. That is the shortest capture path in the
  * product — no typing, no spelling a word you only heard.
  *
- * **Why this is not a route.** The app has no router, and `/share` is a single
- * entry point rather than a destination: the app reads the parameters once at
- * boot, opens Look Up with the word in the field, and rewrites the URL back to
- * the root. Nothing navigates, and there is nothing to navigate back to.
+ * **This module parses; it does not navigate.** `/share` is a route now, and
+ * `ShareRoute` owns what happens next — it reads a capture out of the address
+ * and redirects to Look Up carrying it. Keeping the parsing here and the
+ * navigation there is what lets the rules below be read and changed on their
+ * own: which parameter wins, what counts as a word, when a share is long enough
+ * to be worth keeping as context.
  *
- * **Why the URL is rewritten.** Left alone, `/share?text=…` is what the browser
- * would reload on refresh and what the PWA would restore on relaunch — the app
- * would reopen holding a word shared days ago. `replaceState` clears it without
- * adding a history entry.
+ * **On the URL not being rewritten any more.** It used to be, with
+ * `replaceState`, because `/share?text=…` was what a refresh would reload and
+ * what the PWA would restore on relaunch — the app would reopen holding a word
+ * shared days ago. The redirect replaces that history entry instead, which
+ * solves the same problem as a consequence of navigating rather than as a
+ * separate step that had to be remembered.
  */
 
 export interface SharedCapture {
@@ -25,16 +29,18 @@ export interface SharedCapture {
 }
 
 /**
- * Read a shared word out of the current URL, if this load came from a share.
+ * Read a shared word out of a query string.
  *
- * Returns `undefined` for an ordinary load. Safe to call unconditionally at
- * boot, which is the point — the caller should not have to know how the app
- * was opened.
+ * Returns `undefined` when there is nothing usable in it — an empty selection,
+ * or a share that carried only an image.
+ *
+ * Takes the query string rather than reading `window.location`, so what is
+ * parsed is the address the caller means. The caller is the `/share` route,
+ * which has the current location already; the old version read the window and
+ * checked the path itself, because at the time there was no route to be sure it
+ * was on.
  */
-export function readSharedCapture(): SharedCapture | undefined {
-  const { pathname, search } = window.location
-  if (!pathname.endsWith('/share')) return undefined
-
+export function readSharedCapture(search: string): SharedCapture | undefined {
   const params = new URLSearchParams(search)
   /*
    * Android sends the selection in `text`; some apps put it in `title`, and a
@@ -46,11 +52,6 @@ export function readSharedCapture(): SharedCapture | undefined {
   if (!raw) return undefined
 
   return extractWord(raw)
-}
-
-/** Clear the share parameters so a refresh does not replay the capture. */
-export function clearShareUrl(): void {
-  window.history.replaceState({}, '', '/')
 }
 
 /**
