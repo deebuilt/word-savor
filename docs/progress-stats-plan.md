@@ -768,16 +768,25 @@ If the answer is no router, then the Practice tab needs an explicit state
 machine of its own, and losing the session on a tab switch has to be an accepted
 cost rather than a surprise.
 
-## Build order for the breakout session
+## Build order
 
-1. **The router decision**, before anything below.
-2. **Incremental session writes** (#5) — small, and it makes everything after it
-   measurable.
-3. **The landing page** (#2) with the selection model (#1), reusing
-   `domain/library.ts`.
-4. **The skip** (#4).
-5. **The end-of-session screen** (#7).
-6. **The results view** (#6).
+**Two sessions, not one.** The router comes first and on its own — see
+"Decisions closed" below.
+
+**Session A — the router.** Convert the app's tabs and word stack to real
+routes. Practice then inherits it rather than being rewritten around it.
+
+**Session B — Practice:**
+
+1. **Incremental session writes**, with quit confirm, back button, and resume
+   after a close — small, and it makes everything after it measurable.
+2. **The landing page** as a menu of practice-type cards, reusing
+   `domain/library.ts` for the selections.
+3. **The skip.**
+4. **The end-of-session screen.**
+5. **The results view.**
+6. **Audio caching, then the pronunciation mode** — the `runtimeCaching` rule
+   has to land before the mode is worth using.
 
 ## What is already built that this can use
 
@@ -789,3 +798,109 @@ cost rather than a surprise.
 - `PracticeSession.results` — recorded now, read by Word detail, with no
   session-level view yet.
 - `wordPracticeRecord` — per-word figures, already used on Word detail.
+
+---
+
+## Decisions closed — 2026-09-18
+
+The three forks above are resolved. Recorded here so the build session opens
+with nothing to re-litigate.
+
+### Fork 1 — the default selection: RESOLVED, and the question was wrong
+
+**Nothing is selected by default.** The question assumed the landing page picks
+a session for you and lets you adjust it. Ruthnie: *"nothing is selected by
+default when you open practice. That's the whole point."*
+
+The landing page is a **menu of practice types**, shown as cards. Tapping a card
+applies its selection and starts the session — the card *is* the choice, so
+there is no pre-selected default to override and no Start button to hunt for.
+
+Cards to build:
+
+- **10 most overdue** — the fixed-count option, a predictable ~40 questions.
+- **All currently due** — however many that is.
+- Plus the selections `domain/library.ts` already implements: not practiced,
+  not used, going cold, longest unused.
+- **Hand-picked** — opens the word list with checkboxes.
+
+Explicitly **not** a card: "whatever you picked last session." It reads as a
+convenience and is really a hidden state the reader cannot see before tapping.
+
+This reframes the page. It is not a configuration screen in front of a queue; it
+is the list of ways to practice, and the queue is what a card produces.
+
+### Fork 2 — partial sessions: RESOLVED, and it grew
+
+**Yes, answered drills are saved when a session is abandoned.** Write the
+session row on the first answer and update it after every answer. `addSession`
+is already a `put`, so re-writing the same id overwrites rather than
+duplicating. The session takes its id at start.
+
+`endedAt` then means "last answered", not "finished".
+
+**The streak follows:** a day with any answered drill counts. Answering a drill
+is not free the way saving a word is, and no threshold has to be explained or
+tuned.
+
+**Three things came with this, and they are part of the work:**
+
+- **A back button out of a session.** There is currently no way out of Practice
+  except finishing or switching tabs.
+- **A confirm on quit.** "Are you sure you want to quit?" — deliberate exits
+  only.
+- **Surviving a closed app.** Ruthnie: *"if I just close the app, then we have
+  to think about, are we storing the progress? I want this to do real things
+  that real apps do."* Correct, and today it is lost entirely. Incremental
+  writes get the *answers* persisted; resuming the session's **position** needs
+  the in-progress session's id and step index stored too, so reopening Practice
+  can offer to continue. Treat resume as part of this fork, not a later polish.
+
+### Fork 3 — the router: RESOLVED
+
+**Yes, and it goes first — in its own session, before Practice is built.**
+
+Ruthnie: *"maybe I should go into my next session working on the router. And
+then my practice page could just inherit it."* That is the right sequencing.
+Four new states land in the Practice tab (landing, session, end screen,
+results), and building them on local state means rewriting all four when routes
+arrive.
+
+It also fixes a live bug: `App.tsx` unmounts a tab's contents on switch, so
+leaving Practice mid-session loses the session. That is the same problem as
+"surviving a closed app" from fork 2, and the router is half its answer.
+
+**So the order is: router session → Practice session.**
+
+## Audio — checked 2026-09-18, and a mode worth building
+
+Ruthnie asked whether audio is stored or re-fetched, and whether a pronunciation
+practice could exist. Answers, from the code rather than from memory:
+
+**The URL is stored; the file is not.** `SavedWord.audioUrl` holds a link to
+`media.merriam-webster.com`, built by `buildAudioUrl` in `api/merriam.ts`. Every
+tap on play is a network request to Merriam-Webster's CDN.
+
+**Nothing caches the MP3s.** `vite.config.ts` has no `runtimeCaching`;
+`globPatterns` precaches only the app's own build output. So:
+
+- Audio does not work offline, which is the one hole in an app whose library is
+  otherwise fully readable offline.
+- Every replay costs a round trip.
+- A pronunciation mode tapping through 20 words would be 20 network requests,
+  which would feel broken on a poor connection.
+
+**Fix before building the mode:** add a `runtimeCaching` rule for
+`media.merriam-webster.com` (CacheFirst — an MP3 for a word never changes). Each
+file is fetched once and served from cache after. Small, and it makes audio work
+offline as a side effect.
+
+**The mode itself is worth building and is not a drill.** No scoring, no right
+answer, no FSRS: a list of the library's words, each tappable to hear. It fills
+a real gap — every existing drill builds *recognition*, and none of them ever
+confirms the reader can say the word out loud. It belongs on the Practice
+landing page as a card beside the drill types, marked as practice rather than
+as a scored session.
+
+Words with no `audioUrl` are excluded from the mode, not shown silent. Merriam
+does not have audio for everything.
