@@ -481,30 +481,14 @@ penalize a late review and neither should the label.
 
 ## Deferred — the Practice page needs its own session
 
-Everything on Practice is out of scope until then, by decision rather than
-oversight. The open questions are entangled and none is a stats problem:
+Everything on Practice was left alone in this session, by decision rather than
+oversight: the open questions are entangled and none of them is a stats problem.
+**They are worked through in full at the end of this document**, under "The
+Practice session — what to settle before building."
 
-- **Session bounding.** *"Yeah, I do, but how?"* is the real question — every
-  word getting its full run of drills makes a 20-word library ~100 steps. The
-  binding is not the hard part; choosing what a session should contain is.
-- **A landing page.** Practice drops straight onto question one. It should open
-  on something that says what the session will be, ideally with the words
-  selectable so the length is known before starting.
-- **No way to skip.** There is no "I don't know this" — the only way past a
-  question is to get it wrong, which corrupts the accuracy figure with answers
-  nobody meant.
-- **Where results are displayed.** `results` is being recorded now, and Word
-  detail reads it, but there is no session-level view of it. That view belongs
-  on Practice, behind the landing page that does not exist yet.
-
-**These push on the router question.** A landing page, a session view, and a
-results view are three destinations inside one tab that local state cannot
-address. Ruthnie: *"we have literally no routing, so I don't know how you want
-to do that."* Still not blocking, but it is now the second plan to name it.
-
-**The library can feed that landing page.** The sort and filter built here —
+**The library work feeds it directly.** The sorts and filters built here —
 longest unused, not practiced, going cold — are the same selections a
-pre-session word picker needs. That is why this went first.
+pre-session word picker needs, which is why this went first.
 
 ## Rule 7 — a stat must not imply a rule the app does not enforce
 
@@ -595,3 +579,213 @@ naming it.
 Say literally what is meant, name the object, and prefer a label and a figure to
 a sentence. This screen carries more prose than any other in the app — every
 sentence added here is one more thing to skip past.
+
+---
+
+# The Practice session — what to settle before building
+
+Written 2026-09-18, at the end of the stats session, for the breakout session
+that builds Practice. Everything here was deferred by decision rather than
+oversight: the questions are entangled, and answering them one at a time
+produces a worse page than answering them together.
+
+The goal of this section is that **the build session opens with no open
+questions**. Where a decision is already made, it says so. Where a real fork
+remains, it is marked **FORK** and stated as a choice with a recommendation.
+
+## What is wrong with Practice today
+
+One sentence each, because these are the constraints everything below has to
+satisfy.
+
+1. **Every word gets its full run of drills, every session.** A 20-word library
+   is roughly 100 steps. This is almost certainly why no session was finished
+   before 2026-09-17.
+2. **It opens on question one.** There is no landing, so a reader cannot see
+   what the session will be, how long it is, or what it covers before being
+   inside it.
+3. **There is no way to skip.** The only way past a question you cannot answer
+   is to answer it wrong, which writes a wrong answer nobody meant into the
+   record.
+4. **Per-drill results are written only when the session ends.** Answer forty
+   drills, leave at step forty-one, and all forty are discarded.
+5. **The schedule is computed and ignored.** `fsrs.due` is maintained on every
+   answer and nothing reads it when building the queue.
+6. **There is nowhere to see results.** `results` is recorded and Word detail
+   reads it per word, but no screen shows a session.
+
+## The decisions
+
+### 1. A session is a selection, not the whole library — SETTLED
+
+The queue is built from every saved word. It should be built from a
+**selection**, chosen before the session starts.
+
+Ruthnie, on hand-picking: *"I want a choice. I don't want it to be enforced that
+I can't grab the word."* That settles the shape of the whole page. The landing
+page is not decoration in front of the queue — it is where the session is
+defined, and the queue becomes the thing it produces.
+
+**The schedule suggests; it never restricts.** This is the rule from the stats
+session (rule 7, above), and it is the single most important constraint on this
+build. `fsrs.due` can order a list, mark a word as due, or pre-select a set. It
+must never remove a word from what can be chosen. Anki and SuperMemo both work
+this way — due is a recommendation, and anything is drillable on demand. An app
+that refuses to practice a word its owner asked for has mistaken its bookkeeping
+for the goal.
+
+### 2. The landing page — SETTLED in shape, FORK on one detail
+
+Practice opens on a screen that says what the session will be and lets it be
+changed. It needs four things:
+
+- **A count and a length estimate.** "12 words, about 48 questions." The
+  estimate is honest arithmetic, not a guess: `buildDrillsForWord` already
+  returns the exact drill list per word, so the count is known before the
+  session starts. This is the single most valuable thing on the page — it is
+  the answer to *"I know how short or long it's going to be."*
+- **A default selection**, already made, so Start is one tap for anyone who does
+  not want to choose.
+- **Quick selections**, which are the Library filters reused: due, not
+  practiced, not used, going cold, longest unused. `domain/library.ts` already
+  implements every one of these, which is why the Library work was done first.
+- **A word list with checkboxes**, for hand-picking.
+
+**FORK: what is the default selection?** Options:
+
+- *Everything due*, falling back to everything when nothing is due.
+- *A fixed count of the most overdue*, e.g. 10 words.
+- *Last session's selection.*
+
+**Recommendation: a fixed count of the most overdue, defaulting to 10 words.**
+It makes the default session a predictable length, which is the problem being
+solved — "everything due" can be 2 words or 60 and the reader cannot tell which
+until they are looking at it. Ordering by most overdue uses the schedule as a
+suggestion, which is its correct role. 10 words is roughly 40 questions, which
+is a sitting.
+
+### 3. Session length — SETTLED in principle
+
+Bounded by the **selection**, not by a cap inside the session. A cap that stops
+a reader mid-run ("that's enough for today") is the same paternalism as the
+schedule refusing a word. Choosing 30 words should give a 30-word session.
+
+So the binding is: the default selection is a sensible size, the estimate is
+shown before starting, and a reader who wants 100 steps can have them.
+
+**This answers *"yeah I do, but how?"*** The how is not a cap. It is that the
+session is chosen rather than assembled from everything.
+
+### 4. Skipping — SETTLED
+
+Add an explicit **"I don't know this yet"** on every drill.
+
+What it does:
+
+- Reveals the answer, exactly as a wrong answer does. The teaching moment is the
+  point, and a skip that hides the answer punishes honesty.
+- **Records nothing in `results`.** It is not a wrong answer — the reader told
+  the truth and no question was answered. Writing it as incorrect corrupts
+  accuracy with answers nobody meant, which is the current bug.
+- **Feeds the scheduler as a lapse.** FSRS should hear "not known", because that
+  is exactly what it needs to shorten the interval. This is the one place where
+  skip and wrong agree.
+
+The asymmetry is deliberate and worth stating: **the record is about what the
+reader answered; the schedule is about what they know.** A skip is silent in one
+and loud in the other.
+
+### 5. When results are written — FORK, and it touches the streak
+
+Today `results` is written once, when the session ends. Ruthnie, on finding
+this: *"I guess that is the argument. It should keep counting every time I run
+the drill."*
+
+**Recommendation: write the session row on the first answer, and update it
+after every answer.** `addSession` is already a `put`, so re-writing the same id
+overwrites rather than duplicating. Give the session its id at start and file it
+incrementally.
+
+**The knock-on, which must be decided at the same time:** `computeStreak` counts
+a day as practiced if a session ended that day. If partial sessions are written,
+a day where the reader answered three drills and walked away starts counting.
+
+Two coherent positions:
+
+- **Any answered drill earns the day.** Simple, and defensible: a drill answered
+  is practice done.
+- **The day is earned at a threshold** — say five drills answered — so opening
+  the app and tapping once does not count.
+
+**Recommendation: any answered drill earns the day.** The threshold is a second
+number to explain and to tune, and the streak already excludes the genuinely
+free action (saving a word). Answering a drill is not free.
+
+Note the session record needs an `endedAt` that means "last answered", not
+"finished", once it is written incrementally.
+
+### 6. The results view — SETTLED in placement, FORK on depth
+
+Session results belong on Practice, reached from the landing page. Progress
+already holds the *history* across sessions; this is one session in detail.
+
+**FORK: how much detail?** Either a list of sessions with a score each (which
+Progress already has), or a per-session drill-down showing every word and how it
+went.
+
+**Recommendation: the drill-down.** The list already exists on Progress, so
+building it again on Practice adds a second place to read the same thing. The
+per-word detail is the thing `results` was added for and the thing nothing can
+currently show.
+
+### 7. The end-of-session screen — SETTLED
+
+Today it shows a score and one button. It should show what the session did — the
+words covered and how each went — and offer the same landing page as the way to
+start another, so "practice again" does not mean "the same 100 steps again."
+
+## The router
+
+Three of the decisions above add a destination inside the Practice tab: the
+landing page, the session, and the results view. The end-of-session screen is a
+fourth state. Local state can hold four states, but it cannot give any of them a
+URL.
+
+Ruthnie: *"we have literally no routing, so I don't know how you want to do
+that."*
+
+**This is now the second plan to name it, and the first where it is load-bearing
+rather than a growing cost.** The costs that bite here specifically: no back
+button out of a session, no link to a past session, and a reader who switches
+tabs mid-session loses their place — `App.tsx` unmounts the tab's contents.
+
+**Recommendation: settle the router before building the landing page, not
+after.** Retrofitting routes across four states that were built as local state
+means rewriting all four. The app is five tabs and a word stack; converting it
+is a contained piece of work now and a much larger one after Practice grows.
+
+If the answer is no router, then the Practice tab needs an explicit state
+machine of its own, and losing the session on a tab switch has to be an accepted
+cost rather than a surprise.
+
+## Build order for the breakout session
+
+1. **The router decision**, before anything below.
+2. **Incremental session writes** (#5) — small, and it makes everything after it
+   measurable.
+3. **The landing page** (#2) with the selection model (#1), reusing
+   `domain/library.ts`.
+4. **The skip** (#4).
+5. **The end-of-session screen** (#7).
+6. **The results view** (#6).
+
+## What is already built that this can use
+
+- `domain/library.ts` — every quick selection on the landing page: due, not
+  practiced, not used, going cold, longest unused, plus search. Built in the
+  stats session specifically to feed this.
+- `buildPracticeQueue` / `buildDrillsForWord` — returns the exact drill list per
+  word, so the length estimate is arithmetic rather than a guess.
+- `PracticeSession.results` — recorded now, read by Word detail, with no
+  session-level view yet.
+- `wordPracticeRecord` — per-word figures, already used on Word detail.
