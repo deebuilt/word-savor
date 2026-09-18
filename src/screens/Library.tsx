@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Input, Segmented, Select } from 'antd'
+import { Input, Select } from 'antd'
 import type { SavedWord } from '../types/domain'
 import { listWords } from '../storage/db'
 import {
@@ -40,6 +40,18 @@ import styles from './Library.module.css'
  *
  * **Two lines of definition per row.** One line cuts most definitions
  * mid-clause and ends up less recognisable than no definition at all.
+ *
+ * **Nothing here is gated on how many words the library holds.** Search, sort
+ * and filter used to appear only above a word count, on the reasoning that a
+ * library fitting on one screen has nothing to narrow. True, and beside the
+ * point: a screen that changes shape as a collection grows cannot be learned,
+ * cannot become a habit, and cannot be described to anyone — two people with
+ * different libraries are looking at different apps, which is exactly how a
+ * 14-word phone and a 4-word desktop ended up disagreeing about what this
+ * screen contains. A quiet control that does little is cheaper than a control
+ * that comes and goes. The only gate left is zero, where there is genuinely
+ * nothing to narrow, and the letter strip, which is conditional on *content*:
+ * a strip holding one letter cannot do anything at all.
  */
 
 interface LibraryProps {
@@ -145,52 +157,71 @@ export function Library({ refreshToken = 0, onOpenWord }: LibraryProps) {
         )}
       </div>
 
-      {/* The search field earns its place only once scanning gets hard. */}
-      {total > 8 && (
-        <div className={styles.search}>
-          <Input.Search
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Find a word"
-            allowClear
-            autoCapitalize="none"
-            autoCorrect="off"
-            spellCheck={false}
-          />
-        </div>
-      )}
-
       {/*
-        Sort and filter appear once there is enough to order.
-        Below that threshold the whole library is on one screen and every
-        control is a way to hide part of what you can already see.
+        Controls are hidden only for a genuinely empty library — at zero, where
+        there is nothing to search or narrow and the one useful thing on screen
+        is how to add a word. Not below a word count: a screen that changes
+        shape as a collection grows cannot be learned or built into a habit, and
+        two people with different libraries end up looking at different apps.
       */}
-      {total > 5 && (
-        <div className={styles.controls}>
-          <Segmented
-            className={styles.filters}
-            value={filter}
-            onChange={(value) => setFilter(value as LibraryFilter)}
-            options={FILTER_OPTIONS.map((option) => ({
-              label: option.label,
-              value: option.id,
-            }))}
-            size="small"
-          />
-          <Select
-            className={styles.sort}
-            value={sort}
-            onChange={(value: LibrarySort) => setSort(value)}
-            size="small"
-            variant="borderless"
-            popupMatchSelectWidth={false}
-            aria-label="Sort words"
-            options={SORT_OPTIONS.map((option) => ({
-              label: option.label,
-              value: option.id,
-            }))}
-          />
-        </div>
+      {total > 0 && (
+        <>
+          <div className={styles.search}>
+            <Input.Search
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Find a word"
+              allowClear
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+            />
+          </div>
+
+          {/*
+            Two dropdowns, side by side. They do different jobs and compose:
+            the filter picks which words are in the list, the sort arranges
+            whatever survives. So "Favorites" and "Least used" together means
+            favorites, least-used first.
+
+            Favorite is a filter rather than a sort because it is a yes/no per
+            word — there is no order to arrange 14 words "by favoriteness" in,
+            while every sort here reads a value that varies across words. As a
+            sort it could only mean "favorites first, then the rest", which
+            would lose the ability to see favorites *only*.
+
+            One interaction model rather than two: an earlier version paired a
+            segmented strip with a dropdown, which put two kinds of control
+            side by side doing the same kind of job and cost a second row at
+            375px. The trade is that the filters are no longer visible at rest,
+            so "Going cold" has to be found by opening the menu — acceptable in
+            a tool its owner uses daily and learns once.
+          */}
+          <div className={styles.controls}>
+            <Select
+              className={styles.control}
+              value={sort}
+              onChange={(value: LibrarySort) => setSort(value)}
+              popupMatchSelectWidth={false}
+              aria-label="Sort words"
+              options={SORT_OPTIONS.map((option) => ({
+                label: option.label,
+                value: option.id,
+              }))}
+            />
+            <Select
+              className={styles.control}
+              value={filter}
+              onChange={(value: LibraryFilter) => setFilter(value)}
+              popupMatchSelectWidth={false}
+              aria-label="Filter words"
+              options={FILTER_OPTIONS.map((option) => ({
+                label: option.label,
+                value: option.id,
+              }))}
+            />
+          </div>
+        </>
       )}
 
       {/*

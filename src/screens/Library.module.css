@@ -49,41 +49,36 @@
 /* Controls ----------------------------------------------------------------- */
 
 /*
- * Filter and sort on one line.
+ * Sort and filter, side by side.
  *
- * Wraps rather than scrolling: these are two controls, not a list, and a sort
- * dropdown that can slide out of view is a control the reader has to go looking
- * for. The filter takes the space it needs and the sort sits at the end of the
- * row, dropping below it on a narrow phone.
+ * Two equal halves of one row, which is why they are one grid rather than a
+ * flex row with a gap: equal columns keep the two menus the same width at every
+ * viewport, so neither reads as the more important one. They are the same kind
+ * of control doing the same kind of job.
+ *
+ * One row on a phone, not two. An earlier version used a segmented strip for
+ * the filters, which needed its own line at 375px and pushed the list below the
+ * fold.
  */
 .controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 /*
- * The filter segments scroll sideways within their own track, so five options
- * never force the row taller on a narrow screen.
+ * `min-width: 0` so a long option label cannot push a column past its half — a
+ * grid item defaults to `auto`, which refuses to shrink below its content and
+ * would break the equal halves the moment "Recently added" is selected.
+ *
+ * These keep antd's default height rather than `size="small"`. They are the two
+ * controls most often reached for on this screen, and a small select is around
+ * a 24px tap target — under every touch guideline there is, and it read as
+ * cramped on a phone.
  */
-.filters {
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.filters::-webkit-scrollbar {
-  display: none;
-}
-
-.sort {
-  flex: none;
-  /* Borderless, so it reads as a label that happens to be adjustable rather
-     than a form field competing with the filter beside it. */
-  min-width: 120px;
+.control {
+  min-width: 0;
 }
 
 .median {
