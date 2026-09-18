@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { OddOneOutDrill } from '../../domain/puzzles'
 import { Word } from '../word/Word'
 import { DrillAnswer } from './DrillAnswer'
+import { outcomeOf, readsAsCorrect, type Outcome } from './drillOutcome'
 import { TermList } from './TermList'
 import styles from './PracticeCards.module.css'
 
@@ -21,14 +22,15 @@ import styles from './PracticeCards.module.css'
 interface OddOneOutCardProps {
   drill: OddOneOutDrill
   /** Set when Back has returned to this card — shows the outcome without allowing a fresh pick. */
-  answered?: boolean
-  onAnswer: (correct: boolean) => void
+  answered?: Outcome
+  onAnswer: (outcome: Outcome) => void
 }
 
 export function OddOneOutCard({ drill, answered, onAnswer }: OddOneOutCardProps) {
   const [picked, setPicked] = useState<string | undefined>(undefined)
 
-  const settled = answered ?? (picked !== undefined ? picked === drill.impostor : undefined)
+  const settled =
+    answered ?? (picked !== undefined ? outcomeOf(picked === drill.impostor) : undefined)
   const showOptionState = answered !== undefined || picked !== undefined
 
   // The terms the drill drew from — every option except the impostor. Shown in
@@ -63,11 +65,11 @@ export function OddOneOutCard({ drill, answered, onAnswer }: OddOneOutCardProps)
         })}
       </div>
 
-      {settled !== undefined && (
+      {settled && (
         <DrillAnswer
-          correct={settled}
+          correct={readsAsCorrect(settled)}
           statement={
-            settled
+            settled === 'correct'
               ? `Right — the rest are related to “${drill.word.word}.”`
               : `“${drill.impostor}” was the odd one out.`
           }

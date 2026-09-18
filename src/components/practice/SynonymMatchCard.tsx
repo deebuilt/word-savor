@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { SynonymMatchDrill } from '../../domain/puzzles'
 import { Word } from '../word/Word'
 import { DrillAnswer } from './DrillAnswer'
+import { outcomeOf, readsAsCorrect, type Outcome } from './drillOutcome'
 import { TermList } from './TermList'
 import styles from './PracticeCards.module.css'
 
@@ -32,14 +33,15 @@ import styles from './PracticeCards.module.css'
 interface SynonymMatchCardProps {
   drill: SynonymMatchDrill
   /** Set when Back has returned to this card — shows the outcome without allowing a fresh pick. */
-  answered?: boolean
-  onAnswer: (correct: boolean) => void
+  answered?: Outcome
+  onAnswer: (outcome: Outcome) => void
 }
 
 export function SynonymMatchCard({ drill, answered, onAnswer }: SynonymMatchCardProps) {
   const [picked, setPicked] = useState<string | undefined>(undefined)
 
-  const settled = answered ?? (picked !== undefined ? picked === drill.answer : undefined)
+  const settled =
+    answered ?? (picked !== undefined ? outcomeOf(picked === drill.answer) : undefined)
   const showOptionState = answered !== undefined || picked !== undefined
 
   return (
@@ -76,13 +78,15 @@ export function SynonymMatchCard({ drill, answered, onAnswer }: SynonymMatchCard
         })}
       </div>
 
-      {settled !== undefined && (
+      {settled && (
         <DrillAnswer
-          correct={settled}
+          correct={readsAsCorrect(settled)}
           statement={
-            settled
+            settled === 'correct'
               ? `“${drill.answer}” is a synonym of “${drill.word.word}.”`
-              : `Not quite — “${drill.answer}” is a synonym of “${drill.word.word}.”`
+              : settled === 'skipped'
+                ? `“${drill.answer}” is a synonym of “${drill.word.word}.”`
+                : `Not quite — “${drill.answer}” is a synonym of “${drill.word.word}.”`
           }
           reference={
             <>

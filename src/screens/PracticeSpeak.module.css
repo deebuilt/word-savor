@@ -1,0 +1,120 @@
+/*
+ * The pronunciation list.
+ *
+ * The word is set larger here than anywhere else in a list, because on this
+ * screen the word is not a label on a row you might open — it is the thing you
+ * are about to say. Everything else on the row is support.
+ */
+
+.screen {
+  padding: 20px 16px 32px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.head {
+  margin-bottom: 4px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: -6px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--ws-ink-soft);
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.back:hover {
+  color: var(--ws-ink);
+}
+
+.back:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: -2px;
+}
+
+.title {
+  margin: 0 0 6px;
+  font-family: var(--ws-font-word);
+  font-size: calc(38px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-bold);
+  line-height: calc(1.1 * var(--ws-leading-word));
+  letter-spacing: -0.02em;
+  color: var(--ws-ink);
+}
+
+.blurb {
+  margin: 0 0 20px;
+  max-width: 44ch;
+  font-family: var(--ws-font-body);
+  font-size: calc(14px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  color: var(--ws-ink-soft);
+}
+
+.state {
+  margin-top: 24px;
+  max-width: 44ch;
+  font-family: var(--ws-font-body);
+  font-size: calc(15px * var(--ws-scale-body));
+  line-height: calc(1.55 * var(--ws-leading-body));
+  color: var(--ws-ink-soft);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ws-line);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ws-line);
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.word {
+  font-family: var(--ws-font-word);
+  font-size: calc(21px * var(--ws-scale-word));
+  line-height: calc(1.2 * var(--ws-leading-word));
+  color: var(--ws-ink);
+}
+
+/*
+ * The respelling, where the dictionary gave one. It is the bridge between
+ * seeing the word and saying it, which is this screen's entire subject — so it
+ * sits under the word rather than being left to the detail page.
+ */
+.pronunciation {
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  color: var(--ws-ink-faint);
+}
+
+.missing {
+  margin: 16px 0 0;
+  max-width: 44ch;
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  color: var(--ws-ink-faint);
+}

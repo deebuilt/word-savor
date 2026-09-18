@@ -63,31 +63,6 @@
   color: var(--ws-ink-soft);
 }
 
-.audioButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid var(--ws-line);
-  border-radius: 4px;
-  background: none;
-  color: var(--ws-ink-soft);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.audioButton:hover {
-  color: var(--ws-ink);
-  border-color: var(--ws-line-strong);
-}
-
-.audioButton:focus-visible {
-  outline: 2px solid var(--ws-accent);
-  outline-offset: 2px;
-}
-
 /*
  * Rarity.
  *

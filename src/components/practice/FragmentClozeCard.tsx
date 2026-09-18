@@ -3,6 +3,7 @@ import type { FragmentClozeDrill } from '../../domain/puzzles'
 import { Word } from '../word/Word'
 import { SenseList } from '../word/SenseList'
 import { DrillAnswer } from './DrillAnswer'
+import { outcomeOf, readsAsCorrect, type Outcome } from './drillOutcome'
 import styles from './PracticeCards.module.css'
 
 /**
@@ -20,15 +21,16 @@ import styles from './PracticeCards.module.css'
 
 interface FragmentClozeCardProps {
   drill: FragmentClozeDrill
-  /** Set when Back has returned to this card — shows the outcome without allowing a fresh pick. */
-  answered?: boolean
-  onAnswer: (correct: boolean) => void
+  /** Set when Back has returned to this card, or when the reader skipped it — shows the outcome without allowing a fresh pick. */
+  answered?: Outcome
+  onAnswer: (outcome: Outcome) => void
 }
 
 export function FragmentClozeCard({ drill, answered, onAnswer }: FragmentClozeCardProps) {
   const [picked, setPicked] = useState<string | undefined>(undefined)
 
-  const settled = answered ?? (picked !== undefined ? picked === drill.answer : undefined)
+  const settled =
+    answered ?? (picked !== undefined ? outcomeOf(picked === drill.answer) : undefined)
   const showOptionState = answered !== undefined || picked !== undefined
 
   return (
@@ -37,7 +39,7 @@ export function FragmentClozeCard({ drill, answered, onAnswer }: FragmentClozeCa
 
       <p className={styles.sentence}>
         {drill.before}
-        <span className={styles.blank}>{settled !== undefined ? drill.word.word : '     '}</span>
+        <span className={styles.blank}>{settled ? drill.word.word : '     '}</span>
         {drill.after}
       </p>
 
@@ -63,10 +65,12 @@ export function FragmentClozeCard({ drill, answered, onAnswer }: FragmentClozeCa
         })}
       </div>
 
-      {settled !== undefined && (
+      {settled && (
         <DrillAnswer
-          correct={settled}
-          statement={settled ? 'Right.' : `The word is “${drill.word.word}.”`}
+          correct={readsAsCorrect(settled)}
+          statement={
+            settled === 'correct' ? 'Right.' : `The word is “${drill.word.word}.”`
+          }
           reference={<SenseList senses={drill.word.senses} />}
           onNext={() => onAnswer(settled)}
         />

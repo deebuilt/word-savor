@@ -1009,3 +1009,397 @@ rather than as a fifth kind of state inside the screen.
   GitHub Pages. No host config was needed.
 - Typecheck and lint are clean. The four remaining oxlint warnings are the
   pre-existing `set-state-in-effect` pattern (async read on mount).
+
+---
+
+# Session B — Practice: what shipped, 2026-09-18
+
+Built to the build order under "Decisions closed". All six items are in, plus
+two repairs found along the way. Nothing in the plan was re-litigated; two
+things grew, and both are noted below.
+
+## The addresses
+
+`/practice` is a layout with five screens under it, rather than one route
+holding four kinds of state.
+
+| Path | Screen |
+| --- | --- |
+| `/practice` | the menu of practice types |
+| `/practice/choose` | hand-picking the session's words |
+| `/practice/session` | the run itself |
+| `/practice/done` | what the session just did |
+| `/practice/results/:sessionId` | any past session, in detail |
+| `/practice/speak` | the pronunciation list |
+
+The menu is an **index route**, which is the one place the app bends its own
+"one canonical path per screen" rule. `/practice` is what the nav points at and
+where a finished session returns to, so giving the menu a deeper path of its own
+would make the tab's address and the tab's home screen two different things.
+
+**The run lives on the layout, not on any screen.** React Router unmounts the
+old route's element on navigation exactly as the conditional render did, so a
+run owned by the session screen would die on the way to its own end screen. On
+the layout it survives every move within `/practice`. It still dies leaving the
+tab entirely — which is what the parked run answers.
+
+## The five decisions worth keeping
+
+**Incremental writes needed a second half nobody had named: resume has to read
+the answers back.** Every answer re-writes the whole session row from the run's
+own state. A session resumed with an empty answer map therefore files a row
+holding *one* answer the next time anything is answered — overwriting the forty
+already stored. Incremental writes and resume only work together if what comes
+back is what went in, so `replayAnswers` rebuilds the map from the filed
+`results`. This was a real gap in the plan's design, caught before it shipped
+but only just; it is the single most important line of this session.
+
+Results are matched back by `(wordId, drill)` rather than by step index, because
+the queue is rebuilt on resume and can differ in length. Skips do not come back,
+which is correct twice over: they are deliberately not in `results`, and "I
+don't know this yet" is a statement about a moment a returning reader is
+entitled to revisit.
+
+**Writes are computed outside the state updater.** The old code filed its
+session from an effect with a ref guard, and its own comment explained why: a
+state updater can be called twice for one transition, and React does exactly
+that in development. The rebuild reads the run from a ref instead, so a
+transition is computed once, written once, then set. The writes are serialised
+on a promise chain — IndexedDB does not promise the later of two in-flight
+writes lands last, and a stale record overwriting a newer one loses the most
+recent answer.
+
+**The skip reveals rather than advances.** Tapping "I don't know this yet" puts
+the card into the same settled state a miss produces; the card's own Next button
+then moves on and reports `skipped`. Jumping straight to the next question would
+have shown the honest answer *less* than the wrong one shows, which punishes it.
+The prop on all five drill cards changed from `answered?: boolean` to
+`answered?: Outcome` to carry this — a skip has no room in a boolean, and
+smuggling it through as a wrong answer is the exact bug the skip removes.
+
+The "I had it, just misspelled" escape on the two typed cards is now offered
+**only on a wrong answer**. A reader who has just said they do not know the word
+cannot then claim they had it, and offering it there would make the honest
+option the one that costs you.
+
+**The landing page is rows, not tiles.** Each row is a way to practice with its
+size on the right, so the menu reads as a column of label-and-figure — the same
+shape as a Progress stat row and the word detail's record. Tiles would set the
+counts zigzagging across two columns, and the figure is the reason to tap.
+
+Empty cards stay, greyed and untappable, on the argument that ungated the
+Library controls: a menu whose items come and go as a library changes cannot be
+learned or described. "Nothing is going cold" is also worth being told.
+
+**`buildPracticeQueue` was replaced by `buildQueueFor`.** The old one shuffled
+the whole library itself, which was right while a session *was* the whole
+library. Once a session became a selection the shuffle was wrong twice: a card's
+order is part of what it selected, and a resumed session re-shuffled hands back
+a different run at the same step index. The caller decides the order now; the
+builder only expands words into drills. `pool` stays the whole library, so
+distractors are never just the other three words in a four-word session.
+
+## What grew beyond the plan
+
+**A `runs` object store, at database version 2.** The plan said to store "the
+in-progress session's id and step index"; it did not say where. It is its own
+store rather than a field on the session, because the two answer different
+questions: `PracticeSession` is the historical record and is true the moment it
+is written, while the run is live position that is meaningless once the session
+ends. Folding it in would put a field on every historical row that is null for
+all but one of them. One row, under `CURRENT_RUN_KEY` — resuming two
+half-finished sessions is a choice nobody asked for.
+
+`addSession` became `putSession`, because it is now called after every answer
+and the name should say what it does under repeated calls.
+
+**`AudioButton` was globalised before the pronunciation mode could use it.** It
+was defined twice, identically, in Look Up and the word detail, each reading its
+own screen's stylesheet for the same rule. The mode would have made three
+copies, which is the point at which pasted code stops being a detail. It is now
+`components/word/AudioButton.tsx` with a `size` step, and both screens' orphaned
+`.audioButton` rules are gone.
+
+## Two fields added to `PracticeSession`
+
+Both optional, and both for the same reason: absence has to stay readable.
+
+- **`selection`** — which card the session came from. Sessions from before the
+  landing page had none to record (the queue was everything, every time), so
+  absent reads as "the whole library" rather than guessing at a card that did
+  not exist.
+- **`completed`** — whether the reader reached the end. Once partial sessions
+  are stored, six answers could be a short session finished or a long one
+  abandoned, and nothing else can tell them apart. Absent means the row predates
+  the flag, and every one of those was filed on completion.
+
+`endedAt` now means **last answered**, not finished. The two readings agree for
+a completed run and part company under incremental writes; "last answered" is
+the one that is always true. `computeStreak` already keyed on `endedAt`, so the
+decision that any answered drill earns the day needed no code change at all.
+
+## Audio caching
+
+A `runtimeCaching` rule for `media.merriam-webster.com`, CacheFirst, a year and
+300 entries. `cacheableResponse: { statuses: [0, 200] }` is load-bearing and
+easy to miss: the CDN answers cross-origin requests opaquely, opaque responses
+have status 0, and without 0 in the list Workbox refuses to store any of them
+and the cache stays permanently empty. Verified present in the generated
+`dist/sw.js`.
+
+## Not done, and deliberately
+
+**The pronunciation mode records nothing.** No scoring, no FSRS, no session —
+per the plan. It sits under its own "Not a test" heading below the menu rather
+than in it, because a row among the counted ones would be promising a length it
+does not have. Words with no `audioUrl` are excluded and the count of missing
+ones is stated.
+
+**`/practice/session` has no resume of its own position within a page load.**
+Refreshing mid-session redirects to the menu, which is already offering to
+continue. That is the intended path: the menu is the screen that can actually
+restart the run.
+
+## State
+
+Typecheck and lint clean. The three remaining oxlint warnings are the
+pre-existing `set-state-in-effect` pattern in `refresh.tsx`, `WordDetail.tsx`,
+and `RelatedWordCard.tsx` — none of them touched this session. Production build
+compiles.
+
+**Verified by Ruthnie in the running app on 2026-09-18, after the copy pass and
+card removals recorded below.** Committed at the end of that session.
+
+## Practice menu copy — revised 2026-09-18, and two gaps it exposed
+
+Ruthnie read every subtitle on the menu and rewrote most of them. The edits are
+small; what they uncovered is not, and both gaps below are real work rather than
+wording.
+
+### The copy, mid-pass
+
+**Superseded — see "Two cards cut" below for what shipped.** This table is the
+state partway through the same conversation, kept because the two rows that did
+not survive it are the point: "10 most overdue" and "Longest unused" were still
+being reworded here, and the rewording is what proved they had to go.
+
+| Card | Subtitle |
+| --- | --- |
+| 10 most overdue | The words the schedule has been waiting on longest. |
+| Everything due | Every word ready to practice. |
+| Never practiced | Saved, and not yet drilled. |
+| Never used | Words never marked as used. |
+| Going cold | Saved a fortnight ago or more, and never marked used. |
+| Longest unused | The words marked used least recently. |
+| Choose your own | Your selected words for practice. |
+| Audio practice | Listen and repeat. Nothing is scored. |
+
+The failure running through the originals was the same one the word detail's
+labels hit: **writing around the thing instead of naming it.**
+
+- *"Drilled, maybe — but never marked used in the wild."* Describes what the
+  card does **not** filter on. Ruthnie: *"Why can't you just put never marked
+  used? ... You don't have to bring up what it's not. Or what it may be is.
+  That's weird."* A subtitle states what the card selects. Nothing else.
+- *"The words furthest from the last time you said one."* — *"You said one
+  what?"* A pronoun standing in for the noun, twice asked about and still not
+  answered. Say the noun.
+- *"Every word the schedule says is ready, however many that is."* The tail was
+  padding; the head was worse. See below.
+
+"Say them out loud" became **Audio practice** so the label matches the
+convention the other cards follow. Ruthnie is *"a little skeptical about audio
+practice ... but right now it works"* — treat it as provisional. The screen at
+`/practice/speak` was retitled to match: a card and the page it opens carrying
+different names reads as broken.
+
+### Gap 1 — the app never says what the schedule is
+
+Ruthnie: *"The schedule doesn't say shit. What is even the schedule? If I can't
+control the schedule, what is the schedule? Some omnipresent thing?"*
+
+That is a fair reading of the app as it stands. The schedule is FSRS: every word
+carries a due date, and the usage check-in moves it — "used it" pushes it far
+out, "still fuzzy" barely moves it, "not yet" brings it back soon. So it is
+driven **entirely by the reader's own answers** and is not omnipresent at all.
+
+**But no screen anywhere explains this.** There is no page that says what due
+means, what moves it, or why a word comes back when it does. So a subtitle
+saying "the schedule says" refers to a concept the app never introduced, which
+is exactly what makes it sound like an external authority the reader cannot
+reach.
+
+Two subtitles were rewritten to avoid invoking it ("Every word ready to
+practice"), which is the right short-term move — it says what the card selects
+without leaning on an unexplained idea. **The 10-most-overdue card still says
+"the schedule"** and was left alone this pass.
+
+The real fix is to give the schedule a visible identity somewhere: what it is,
+what moves it, and that it only ever suggests. This also connects to rule 7 —
+`fsrs.due` is deliberately not displayed anywhere, and a concept that is never
+shown and never explained is one the copy should not be name-dropping either.
+Until that exists, subtitles should keep saying what a card selects.
+
+### Gap 2 — "used" cannot express recency, so "longest unused" is loose
+
+Ruthnie: *"I can say today that I have ever used a word in the entirety of the
+time that it's been in my library. It doesn't mean that I've used it recently.
+... If we want to add a fourth option, have you used it recently? That's a whole
+different thing."*
+
+Exactly right, and it is a data shape problem that no wording can solve.
+`lastUsedAt` holds the timestamp of the most recent check-in tap, so three
+genuinely different situations land on one field:
+
+1. Marked used this morning.
+2. Marked used once, months ago, never since.
+3. Never marked used at all — which sorts to the **front** of "longest unused",
+   ahead of both.
+
+"The words marked used least recently" describes the middle case honestly and is
+loose at the front. It ships as the best available reading of the field.
+
+The fix is to make recency its own concept rather than deriving it from one
+timestamp — Ruthnie's "fourth option" on the check-in is one shape it could
+take. That is a scheduler and check-in change, not a Practice change, and it
+belongs in its own session. **Do not paper over it with better copy.**
+
+### The rule this leaves behind
+
+A subtitle on a menu says **what the card selects**, in the app's own terms, and
+nothing else. Not what it excludes, not what its words might also be, not what
+some unnamed system thinks. If saying what it selects requires a concept the app
+has never shown the reader, that is a missing screen, not a writing problem.
+
+---
+
+## Two cards cut, and the reason is the data — 2026-09-18
+
+Ruthnie read every subtitle on the Practice menu and cut two cards outright:
+**10 most overdue** and **Longest unused**. Not a copy problem. Both ordered on
+a field the app cannot describe truthfully, and several attempts at rewording
+them failed the same way.
+
+### What went wrong, in order
+
+The first subtitles described what a card *was not* ("Drilled, maybe — but never
+marked used in the wild") or reached for a pronoun instead of a noun ("The words
+furthest from the last time you said one" — *"You said one what?"*). Both are
+the failure already recorded under the word-detail copy notes: writing around
+the thing instead of naming it.
+
+Then, rewriting them, the same instinct produced worse: *"the schedule says"*,
+then *"the schedule has been waiting on longest"*, then *"words waiting longest
+to come back"*. Ruthnie: *"The schedule doesn't wait. What are you talking
+about? What schedule?"* and *"Why are you saying that words are saying and
+waiting and doing things?"*
+
+Right on both counts. Personifying the data was a way of avoiding an order that
+could not be stated plainly. **When copy has to reach, the thing being described
+is the problem — not the writing.**
+
+### Why the two fields cannot be described
+
+**`lastUsedAt` is a tap, not a use.** The usage check-in fires once per word per
+session, and nothing distinguishes one occasion from the same occasion reported
+three sessions running. Ruthnie: *"I'm asked during every drill whether I used
+the word. Did you use coalesce? Yes. Did you use coalesce? Yes."* So the field
+holds when the button was last pressed. "Longest unused" cannot mean what it
+says.
+
+It is loose at both ends, too: a word marked used once months ago, a word marked
+this morning, and a word never marked at all are three different situations on
+one timestamp — and the never-marked words sort to the *front* of the order.
+
+**`fsrs.due` is a recall forecast, not a use record.** FSRS schedules on
+*recall* — when you would forget a word. The four usage answers are mapped onto
+its grades ("used it" → Easy, "not yet" → Again), so a use report is being read
+as a memory signal. Two different things in one field.
+
+Worse, **no screen in the app ever explains it.** There is no page saying what
+due means, what moves it, or that it only ever suggests. Rule 7 already keeps
+`fsrs.due` off every screen. A concept the app deliberately never shows is one
+its copy should not be name-dropping either, which is exactly what made "the
+schedule" read as an external authority the reader cannot reach.
+
+### What this leaves
+
+The five surviving cards each select on something statable:
+
+| Card | Subtitle |
+| --- | --- |
+| Everything due | Every word ready to practice. |
+| Never practiced | Saved, and not yet drilled. |
+| Never used | Words never marked as used. |
+| Going cold | Saved a fortnight ago or more, and never marked used. |
+| Choose your own | Your selected words for practice. |
+
+Plus **Audio practice** below, under "Not a test" — renamed from "Say them out
+loud" to match the others. Ruthnie is *"a little skeptical about audio practice
+... but right now it works"*, so treat it as provisional.
+
+`'overdue'` and `'longest-unused'` stay in the `PracticeSelection` union.
+Sessions already recorded under them hold those strings, and the results view
+still has to name what those sessions were. Retired from the menu, kept in the
+stored vocabulary.
+
+**`Everything due` has the same disease and survived.** It filters on `fsrs.due`
+— the same unexplained forecast. "Every word ready to practice" does not say
+*ready by what measure*. It is quieter about it, not honest about it. Flagged to
+Ruthnie and left in for now.
+
+### The work this creates
+
+**1. Make "used" mean something.** This is the root, and every card built on use
+data inherits it. Ruthnie: *"If we want to add a fourth option, have you used it
+recently? That's a whole different thing."* Two shapes worth considering:
+
+- **Ask less often.** Once a day or once a week per word, so a tap is evidence
+  rather than a reflex.
+- **Ask a better question.** Time-bounded ("in the last week?") gives a real
+  answer where a lifetime yes/no cannot.
+
+Ruthnie will add the two cards back *"once we actually have solid logic on used
+tracking — otherwise it's just either you use it or you didn't."*
+
+**2. Give the schedule an identity, or stop referring to it.** If due dates are
+going to drive anything a reader sees, the app has to say what they are, what
+moves them, and that they only suggest. Until that screen exists, subtitles say
+what a card selects and nothing more.
+
+### The rule
+
+A subtitle names **what the card selects**, in the app's own terms. Not what it
+excludes, not what its words might also be, not what an unnamed system thinks.
+If saying it plainly needs a concept the reader has never been shown, that is a
+missing screen — and if the field itself cannot be described, the card does not
+ship.
+
+---
+
+## Rarity on the Library rows — 2026-09-18
+
+Each row now carries its rarity band between the word and the status dots.
+
+Progress draws the library's spread across the bands, and nothing anywhere said
+which band a given word was in — so "12% very rare" named no words, and the
+spread could be read but never checked against anything. Ruthnie: *"nothing
+tells me which word is very rare."* This is the other half of that figure.
+
+Small caps in the body face rather than the word face, so it reads as a category
+and is never mistaken for part of the word — the word is the only thing on this
+screen in the word face, and that distinction is what makes a long list
+scannable. Muted, because the screen's job is finding a word.
+
+`.rowTop` lost its `justify-content: space-between`. With three children that
+would strand the band in the middle of the row; instead the word takes the slack
+and the two markers sit together at the right edge, reading as one group of
+facts about the word.
+
+**Unscored words show nothing**, not a dash and not a guess. `rarityLabel`
+already returns `undefined` for them, and an unmeasured word is not "very rare"
+— labelling it would make the spread above it a lie.
+
+Hidden below 380px. "Very rare" plus the dots plus a long word cannot share one
+line at 375px, and the two things that must survive are the word and its status.
+The band is on the word's own page for anyone who wants it there.

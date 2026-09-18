@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Input, Tag, message } from 'antd'
-import { SearchOutlined, SoundOutlined } from '@ant-design/icons'
+import { SearchOutlined } from '@ant-design/icons'
 import {
   lookupWord,
   toSavedWord,
@@ -12,6 +12,7 @@ import { suggestSpellings } from '../api/datamuse'
 import { addEncounter, getWord, saveWord } from '../storage/db'
 import { Word } from '../components/word/Word'
 import { SenseList } from '../components/word/SenseList'
+import { AudioButton } from '../components/word/AudioButton'
 import styles from './LookUp.module.css'
 
 /**
@@ -436,30 +437,3 @@ function Result({
   )
 }
 
-/**
- * Play the pronunciation.
- *
- * The Audio element is created per press rather than held in state. These are
- * one-second clips from a third-party host that is measurably unreliable, and a
- * retained element that failed to load once stays failed — a fresh one retries
- * for free.
- */
-function AudioButton({ src, word }: { src: string; word: string }) {
-  const play = useCallback(() => {
-    // Playback can reject — an unreachable host, or a browser that has not seen
-    // a user gesture it accepts. Neither is worth an error message for
-    // something entirely supplementary.
-    void new Audio(src).play().catch(() => {})
-  }, [src])
-
-  return (
-    <button
-      type="button"
-      className={styles.audioButton}
-      onClick={play}
-      aria-label={`Hear ${word} pronounced`}
-    >
-      <SoundOutlined />
-    </button>
-  )
-}

@@ -1,0 +1,235 @@
+/*
+ * The session — one card at a time.
+ *
+ * Same screen padding and max-width as Library and the word detail, so
+ * switching tabs never shifts the content column.
+ */
+
+.screen {
+  padding: 20px 16px 32px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/*
+ * Back on the left, progress in the middle, Quit on the right.
+ *
+ * Quit is deliberately a word and not an X. An X in the corner of a session is
+ * ambiguous — it could close the card, the session, or the app — and this one
+ * ends something the reader is partway through. A labelled control says what it
+ * does before it is tapped.
+ */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.backButton {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: -6px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--ws-ink-soft);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.backButton:hover:not(:disabled) {
+  color: var(--ws-ink);
+  background: var(--ws-paper-sunken);
+}
+
+.backButton:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: -2px;
+}
+
+.backButton:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.progress {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  color: var(--ws-ink-faint);
+}
+
+.quitButton {
+  flex: none;
+  height: 32px;
+  margin-right: -6px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--ws-ink-faint);
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.quitButton:hover {
+  color: var(--ws-ink);
+  background: var(--ws-paper-sunken);
+}
+
+.quitButton:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: -2px;
+}
+
+/* Progress bar ------------------------------------------------------------- */
+
+/*
+ * A 2px rule rather than a chunky track. The fraction is already written above
+ * it in words; this is the at-a-glance version of the same fact, and it earns
+ * its place by being almost nothing.
+ */
+.bar {
+  height: 2px;
+  margin-bottom: 20px;
+  border-radius: 1px;
+  background: var(--ws-line);
+  overflow: hidden;
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  background: var(--ws-accent);
+  transition: width 200ms ease-out;
+}
+
+/* Skip --------------------------------------------------------------------- */
+
+/*
+ * Quiet, centred, below the card. It has to be reachable on every question and
+ * it must never compete with answering — a prominent escape is one that gets
+ * taken, and the drill is the point.
+ */
+.skip {
+  display: block;
+  margin: 20px auto 0;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--ws-ink-faint);
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.skip:hover {
+  color: var(--ws-ink-soft);
+}
+
+.skip:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: -2px;
+}
+
+/* Quit confirm ------------------------------------------------------------- */
+
+/*
+ * A centred dialog over a scrim, rather than antd's Modal.
+ *
+ * One confirm with two buttons does not need a modal system, and antd's
+ * portals its content to the document body — outside the shell's scrolling
+ * region and outside the theme scope the tokens are defined in. A dialog that
+ * has to be re-themed to match the app it interrupts is the wrong dialog.
+ */
+.confirmScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 40%);
+}
+
+.confirm {
+  width: 100%;
+  max-width: 340px;
+  padding: 20px;
+  border-radius: 6px;
+  background: var(--ws-paper-raised);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 18%);
+}
+
+.confirmTitle {
+  margin: 0 0 8px;
+  font-family: var(--ws-font-word);
+  font-size: calc(21px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-bold);
+  color: var(--ws-ink);
+}
+
+.confirmBody {
+  margin: 0 0 20px;
+  font-family: var(--ws-font-body);
+  font-size: calc(14px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  color: var(--ws-ink-soft);
+}
+
+/*
+ * The two actions, side by side and equal width. "Keep going" is the accented
+ * one because it is the safe choice — the destructive action should never be
+ * the one the eye lands on first.
+ */
+.confirmActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.confirmCancel,
+.confirmQuit {
+  height: 44px;
+  border-radius: 4px;
+  font-family: var(--ws-font-body);
+  font-size: calc(15px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.confirmCancel {
+  border: none;
+  background: var(--ws-accent);
+  color: var(--ws-paper);
+}
+
+.confirmQuit {
+  border: 1px solid var(--ws-line-strong);
+  background: none;
+  color: var(--ws-ink-soft);
+}
+
+.confirmCancel:focus-visible,
+.confirmQuit:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+}

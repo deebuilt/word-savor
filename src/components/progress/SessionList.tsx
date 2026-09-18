@@ -1,3 +1,5 @@
+import { Link } from 'react-router'
+import { RightOutlined } from '@ant-design/icons'
 import type { SessionRecord } from '../../domain/progress'
 import styles from './SessionList.module.css'
 
@@ -11,6 +13,12 @@ import styles from './SessionList.module.css'
  * Each row states the score as a fraction rather than only a percentage: "12 of
  * 13" carries how much work the session was, which a bare 92% throws away. The
  * percentage sits beside it for comparison across sessions of different sizes.
+ *
+ * **Every row opens that session.** The score answers "how did that go" and
+ * cannot answer "which words let me down" — the per-word breakdown that can
+ * lives under `/practice/results/:id`, and this list is the way in. Rows became
+ * links rather than gaining a column, because the whole row is the session and
+ * a separate "view" affordance would be a second target doing the same job.
  */
 
 interface SessionListProps {
@@ -21,14 +29,17 @@ export function SessionList({ sessions }: SessionListProps) {
   return (
     <ol className={styles.list}>
       {sessions.map((session) => (
-        <li key={session.id} className={styles.row}>
-          <span className={styles.when}>{formatWhen(session.endedAt)}</span>
-          <span className={styles.score}>
-            {session.correct} of {session.total}
-          </span>
-          <span className={styles.accuracy}>
-            {session.accuracy === undefined ? '—' : `${Math.round(session.accuracy * 100)}%`}
-          </span>
+        <li key={session.id}>
+          <Link className={styles.row} to={`/practice/results/${session.id}`}>
+            <span className={styles.when}>{formatWhen(session.endedAt)}</span>
+            <span className={styles.score}>
+              {session.correct} of {session.total}
+            </span>
+            <span className={styles.accuracy}>
+              {session.accuracy === undefined ? '—' : `${Math.round(session.accuracy * 100)}%`}
+            </span>
+            <RightOutlined className={styles.chevron} />
+          </Link>
         </li>
       ))}
     </ol>

@@ -288,16 +288,69 @@ export interface DrillResult {
 }
 
 /**
- * A completed practice run. One row per session, written when it ends.
+ * How a session's words were chosen.
  *
- * This is what streaks are counted from, so it is deliberately a record of
- * *what happened* rather than a score: `correct`/`total` are the drills the
- * reader actually answered, not the drills the queue offered. A session left
- * halfway is not written at all — an abandoned run is not a day of practice.
+ * Stored on the session because "what was this session" is not answerable from
+ * `wordIds` alone — ten overdue words and ten hand-picked words look identical
+ * in the record, and they are not the same practice. The results view reads
+ * this to say what the session *was* rather than only how it went.
+ *
+ * These strings are written to the database, so they are a stored vocabulary
+ * like `DrillKind`: renaming one orphans every session recorded under the old
+ * name.
+ *
+ * **`overdue` and `longest-unused` are retired and no longer offered.** Both
+ * ordered on a date the app could not describe truthfully. `longest-unused`
+ * read `lastUsedAt`, which holds the moment the check-in button was last
+ * tapped — not when the word was last used, since the same occasion can be
+ * reported in every session it comes up in. `overdue` read `fsrs.due`, which is
+ * a *recall* forecast that the usage answers are mapped onto, so it is neither
+ * a use record nor something the app ever explains. A card whose order cannot
+ * be stated plainly does not belong on a menu.
+ *
+ * They stay in this union because sessions already recorded under them are
+ * sitting on these strings, and the results view still has to name what those
+ * sessions were. Retired from the menu, kept in the vocabulary.
+ */
+export type PracticeSelection =
+  | 'overdue'
+  | 'due'
+  | 'unpracticed'
+  | 'unused'
+  | 'cold'
+  | 'longest-unused'
+  | 'hand-picked'
+
+/**
+ * A practice run, written from its first answer onward.
+ *
+ * **No longer only a finished run.** The row is created when the first drill is
+ * answered and re-written after every answer, so a session walked away from
+ * keeps everything that was actually done. Forty drills answered and a close at
+ * forty-one used to discard all forty; now they are the record they always
+ * were. `addSession` is a `put` keyed on `id`, so re-writing the same session
+ * overwrites rather than accumulating rows.
+ *
+ * This is what streaks are counted from, and the rule follows the writes: a day
+ * with any answered drill is a day practiced. Answering a drill is not free the
+ * way saving a word is, so no threshold has to be explained or tuned.
+ *
+ * It stays a record of *what happened* rather than a score: `correct`/`total`
+ * are the drills the reader actually answered, never the drills the queue
+ * offered.
  */
 export interface PracticeSession {
   id: string
   startedAt: number
+  /**
+   * When the last answer landed — **not** when the session finished.
+   *
+   * It meant "finished" while sessions were written once at the end, and those
+   * two readings agree for a completed run. Under incremental writes they part
+   * company, and "last answered" is the one that is always true: an abandoned
+   * session has no finish, but it has a last answer. The streak counts the day
+   * of this instant, which is what makes a partial session earn its day.
+   */
   endedAt: number
   /**
    * `mixed` is what Practice builds today — recall drills and usage check-ins
@@ -305,10 +358,30 @@ export interface PracticeSession {
    * narrower two are kept for the puzzle modes that will sit beside it.
    */
   mode: 'mixed' | 'recall' | 'usage'
+  /**
+   * How the words were chosen.
+   *
+   * Optional because sessions recorded before the landing page existed had no
+   * selection to record — the queue was the whole library every time. Absent
+   * means "this predates chosen sessions", which the results view reports as
+   * the whole library rather than guessing at a card that did not exist.
+   */
+  selection?: PracticeSelection
   /** Every word the session touched, whether or not its drills were answered. */
   wordIds: string[]
   correct: number
   total: number
+  /**
+   * Whether the reader reached the end of the queue.
+   *
+   * Needed once partial sessions are stored: without it a row of six answers
+   * could be a short session finished or a long session abandoned, and the
+   * results view has no way to tell a reader which of those they are looking
+   * at. Optional for the same reason `results` is — sessions written before
+   * incremental writes were only ever filed on completion, so their absence
+   * reads as finished.
+   */
+  completed?: boolean
   /**
    * Every drill answered in this run, in the order they were answered.
    *
@@ -324,3 +397,42 @@ export interface PracticeSession {
    */
   results?: DrillResult[]
 }
+
+/**
+ * Where an unfinished session left off, so reopening Practice can offer it back.
+ *
+ * **Separate from the session row, because they answer different questions.**
+ * `PracticeSession` is the historical record of what was answered — it is
+ * finished the moment it is written and never needs to be resumed to stay true.
+ * This is the *position*: which words, in which order, and how far in. It is
+ * live state, it is meaningless once the session ends, and it is deleted then.
+ * Folding it into the session row would put a field on every historical record
+ * that is null for all but one of them.
+ *
+ * Only one is ever stored — resuming two half-finished sessions is a choice
+ * nobody asked for — so the store holds a single row under `CURRENT_RUN_KEY`.
+ *
+ * **Word ids, not the built queue.** The drills are rebuilt from the words on
+ * resume rather than stored: a drill holds a whole `SavedWord` each, so storing
+ * the queue means storing the same word four times over, and it goes stale the
+ * moment the word is edited. Rebuilding is cheap and always current. The
+ * consequence to accept is that a rebuilt queue can differ in length if a
+ * word's data changed — `stepIndex` is clamped on resume rather than trusted.
+ */
+export interface PracticeRun {
+  /** Always `CURRENT_RUN_KEY`. One run is resumable at a time. */
+  key: string
+  /** The session row this run is writing into, so resuming continues it rather than starting a second. */
+  sessionId: string
+  startedAt: number
+  /** Last touched, for deciding whether a run is too stale to offer back. */
+  updatedAt: number
+  selection: PracticeSelection
+  /** The words, in the order the session drew them — the shuffle is part of the position. */
+  wordIds: string[]
+  /** How far in, as a step index into the rebuilt queue. Clamped on resume. */
+  stepIndex: number
+}
+
+/** The single key every in-progress run is stored under. */
+export const CURRENT_RUN_KEY = 'current'

@@ -224,16 +224,60 @@
   border-radius: 2px;
 }
 
+/*
+ * Word on the left, then the rarity band, then the status dots.
+ *
+ * No `justify-content` any more: with three children, `space-between` would
+ * push the band into the middle of the row, floating between the word and the
+ * dots with nothing to anchor it. Instead the word takes all the slack and the
+ * two markers sit together at the right edge, which keeps them reading as one
+ * group of facts about the word rather than as scattered decoration.
+ */
 .rowTop {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .rowWord {
+  flex: 1;
   min-width: 0;
   transition: color 120ms ease;
+}
+
+/*
+ * The rarity band.
+ *
+ * Small caps in the body face, so it is legible as a *category* and never
+ * mistaken for part of the word — the word is the only thing on this screen set
+ * in the word face, and that distinction is what makes a long list scannable.
+ *
+ * Quiet on purpose. This screen exists to find a word, so the band is a fact
+ * you can check when you want it, not something competing with the word itself
+ * on two hundred rows.
+ */
+.rowRarity {
+  flex: none;
+  font-family: var(--ws-font-body);
+  font-size: calc(10px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ws-ink-faint);
+}
+
+/*
+ * Below 380px the band is dropped rather than shrunk or wrapped.
+ *
+ * "Very rare" plus the dots plus a long word cannot share one line at 375px,
+ * and the two things that must survive are the word and its status. The band
+ * is on the word's own page for anyone who wants it there.
+ */
+@media (max-width: 380px) {
+  .rowRarity {
+    display: none;
+  }
 }
 
 /*

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { DefinitionMatchDrill } from '../../domain/puzzles'
 import { SenseList } from '../word/SenseList'
 import { DrillAnswer } from './DrillAnswer'
+import { outcomeOf, readsAsCorrect, type Outcome } from './drillOutcome'
 import styles from './PracticeCards.module.css'
 
 /**
@@ -23,22 +24,31 @@ import styles from './PracticeCards.module.css'
 
 interface DefinitionMatchCardProps {
   drill: DefinitionMatchDrill
-  /** Set when Back has returned to this card — shows the same outcome without allowing a fresh submit. */
-  answered?: boolean
-  onAnswer: (correct: boolean) => void
+  /** Set when Back has returned to this card, or when the reader skipped it — shows the outcome without allowing a fresh submit. */
+  answered?: Outcome
+  onAnswer: (outcome: Outcome) => void
 }
 
 export function DefinitionMatchCard({ drill, answered, onAnswer }: DefinitionMatchCardProps) {
   const [value, setValue] = useState('')
-  const [result, setResult] = useState<boolean | undefined>(undefined)
+  const [result, setResult] = useState<Outcome | undefined>(undefined)
   const [closeOverride, setCloseOverride] = useState(false)
 
   const settled = answered ?? result
 
   const check = () => {
     if (result !== undefined) return
-    setResult(value.trim().toLowerCase() === drill.word.word.toLowerCase())
+    setResult(outcomeOf(value.trim().toLowerCase() === drill.word.word.toLowerCase()))
   }
+
+  /*
+   * A near miss counts as correct, because what this drill tests — reaching for
+   * the word from its meaning — was demonstrated. It is offered only on a wrong
+   * answer: a reader who has just said they do not know the word cannot then
+   * claim they had it, and offering the escape there would turn the honest
+   * option into the one that costs you.
+   */
+  const reported: Outcome = settled === 'wrong' && closeOverride ? 'correct' : (settled ?? 'wrong')
 
   return (
     <div className={styles.card}>
@@ -57,7 +67,7 @@ export function DefinitionMatchCard({ drill, answered, onAnswer }: DefinitionMat
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
-          placeholder={settled !== undefined ? drill.word.word : 'Type the word'}
+          placeholder={settled ? drill.word.word : 'Type the word'}
           disabled={settled !== undefined}
           autoFocus={answered === undefined}
         />
@@ -68,18 +78,18 @@ export function DefinitionMatchCard({ drill, answered, onAnswer }: DefinitionMat
         )}
       </div>
 
-      {settled !== undefined && (
+      {settled && (
         <DrillAnswer
-          correct={settled || closeOverride}
+          correct={readsAsCorrect(reported)}
           statement={
-            settled ? (
+            settled === 'correct' ? (
               'Right.'
             ) : closeOverride ? (
               `Counted — the word is “${drill.word.word}.”`
             ) : (
               <>
                 The word is “{drill.word.word}.”{' '}
-                {answered === undefined && (
+                {answered === undefined && settled === 'wrong' && (
                   <button
                     type="button"
                     className={styles.closeLink}
@@ -92,7 +102,7 @@ export function DefinitionMatchCard({ drill, answered, onAnswer }: DefinitionMat
             )
           }
           reference={<SenseList senses={drill.word.senses} />}
-          onNext={() => onAnswer(settled || closeOverride)}
+          onNext={() => onAnswer(reported)}
         />
       )}
     </div>

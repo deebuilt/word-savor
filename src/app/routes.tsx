@@ -4,6 +4,12 @@ import { LibraryRoute } from './routes/LibraryRoute'
 import { LookUpRoute } from './routes/LookUpRoute'
 import { MoreRoute } from './routes/MoreRoute'
 import { PracticeRoute } from './routes/PracticeRoute'
+import { PracticeDoneRoute } from './routes/PracticeDoneRoute'
+import { PracticePickRoute } from './routes/PracticePickRoute'
+import { PracticeResultsRoute } from './routes/PracticeResultsRoute'
+import { PracticeSessionRoute } from './routes/PracticeSessionRoute'
+import { PracticeSpeakRoute } from './routes/PracticeSpeakRoute'
+import { PracticeStartRoute } from './routes/PracticeStartRoute'
 import { ProgressRoute } from './routes/ProgressRoute'
 import { ShareRoute } from './routes/ShareRoute'
 import { WordDetailRoute } from './routes/WordDetailRoute'
@@ -49,7 +55,30 @@ export const router = createBrowserRouter([
       { path: 'library', element: <LibraryRoute /> },
       { path: 'library/:wordId', element: <WordDetailRoute /> },
       { path: 'lookup', element: <LookUpRoute /> },
-      { path: 'practice', element: <PracticeRoute /> },
+      /*
+       * Practice is a layout with four screens under it, rather than one route
+       * holding four kinds of state. The layout owns the run — see
+       * `PracticeRoute` — so moving between the menu, the session and the end
+       * screen does not unmount what is being practiced.
+       *
+       * The menu is an index route here, and this is the one place the app
+       * bends its own "one canonical path per screen" rule: `/practice` is what
+       * the nav points at and where a session returns to, so giving the menu
+       * its own deeper path would mean the tab's address and the tab's home
+       * screen were two different things.
+       */
+      {
+        path: 'practice',
+        element: <PracticeRoute />,
+        children: [
+          { index: true, element: <PracticeStartRoute /> },
+          { path: 'choose', element: <PracticePickRoute /> },
+          { path: 'speak', element: <PracticeSpeakRoute /> },
+          { path: 'session', element: <PracticeSessionRoute /> },
+          { path: 'done', element: <PracticeDoneRoute /> },
+          { path: 'results/:sessionId', element: <PracticeResultsRoute /> },
+        ],
+      },
       { path: 'progress', element: <ProgressRoute /> },
       { path: 'more', element: <MoreRoute /> },
       { path: 'share', element: <ShareRoute /> },

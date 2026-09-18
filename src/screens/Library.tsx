@@ -14,6 +14,7 @@ import {
   type LibrarySort,
   type SortOption,
 } from '../domain/library'
+import { rarityLabel } from '../domain/rarity'
 import { Word } from '../components/word/Word'
 import { StatusMark } from '../components/word/StatusMark'
 import { WordMeta } from '../components/word/WordMeta'
@@ -303,6 +304,7 @@ function Row({
   onOpen?: (id: string) => void
 }) {
   const definition = word.senses[0]?.definition
+  const rarity = rarityLabel(word.rarity)
 
   return (
     <button type="button" className={styles.row} onClick={() => onOpen?.(word.id)}>
@@ -310,6 +312,20 @@ function Row({
         <Word size="row" className={styles.rowWord}>
           {word.word}
         </Word>
+        {/*
+         * The rarity band, between the word and the status dots.
+         *
+         * Progress reports how the library is spread across the bands, and
+         * until now nothing said which band any individual word was in — so the
+         * spread could be read but never checked against a word, and "12% very
+         * rare" named no words at all. This is the other half of that figure.
+         *
+         * Absent when Datamuse never scored the word, rather than filled with
+         * a guess or a dash. An unscored word is unmeasured, not very rare, and
+         * a label saying otherwise would make the spread above it a lie. The
+         * same rule `rarityLabel` already follows by returning `undefined`.
+         */}
+        {rarity && <span className={styles.rowRarity}>{rarity}</span>}
         <StatusMark word={word} />
       </span>
       {definition && <span className={styles.rowDefinition}>{definition}</span>}

@@ -1,0 +1,261 @@
+/*
+ * The practice menu.
+ *
+ * A list of rows, not a grid of tiles. Each row is one way to practice with its
+ * size on the right, so the whole menu reads as a column of label-and-figure —
+ * the same shape as a Progress stat row and the same shape as the word detail's
+ * record. There is one way to read a number anywhere in this app, and this is
+ * it.
+ *
+ * Rows rather than tiles for a second reason: the figure is the reason to tap.
+ * Tiles would set the counts in a zigzag across two columns, which is a layout
+ * you have to scan; a column of right-aligned figures is one you can run an eye
+ * down.
+ *
+ * Same screen padding and max-width as Library and the word detail, so
+ * switching tabs never shifts the content column.
+ */
+
+.screen {
+  padding: 20px 16px 32px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.title {
+  margin: 0 0 20px;
+  font-family: var(--ws-font-word);
+  font-size: calc(38px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-bold);
+  line-height: calc(1.1 * var(--ws-leading-word));
+  letter-spacing: -0.02em;
+  color: var(--ws-ink);
+}
+
+.state {
+  margin-top: 24px;
+  max-width: 44ch;
+  color: var(--ws-ink-soft);
+  font-size: calc(15px * var(--ws-scale-body));
+  line-height: calc(1.55 * var(--ws-leading-body));
+}
+
+/* Resume ------------------------------------------------------------------- */
+
+/*
+ * The offer to continue, above the menu and visibly not part of it.
+ *
+ * Accent-tinted and full width, because continuing something already started is
+ * a different act from choosing a new session — given a row like the others it
+ * would read as an eighth way to start, which is exactly what it is not.
+ */
+.resume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 24px;
+  padding: 14px 16px;
+  border: 1px solid var(--ws-accent);
+  border-radius: 4px;
+  background: var(--ws-accent-soft);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.resume:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+}
+
+.resumeLabel {
+  flex: none;
+  font-family: var(--ws-font-body);
+  font-size: calc(15px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  color: var(--ws-accent);
+}
+
+.resumeDetail {
+  flex: 1;
+  min-width: 0;
+  /*
+   * Ellipsis rather than wrap. At 375px a long card label plus a word count can
+   * exceed the row, and a second line here would push the chevron out of
+   * vertical centre — the detail is a reminder of which session it is, so
+   * losing its tail costs nothing.
+   */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  color: var(--ws-ink-soft);
+}
+
+.resumeChevron {
+  flex: none;
+  font-size: 12px;
+  color: var(--ws-accent);
+}
+
+/* The menu ----------------------------------------------------------------- */
+
+.menu {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ws-line);
+}
+
+/*
+ * One row per way to practice.
+ *
+ * Hairline separators rather than a border or shadow per row: seven bordered
+ * boxes stacked down a phone is the card-on-page look, and the rule does the
+ * same separating work with none of the weight.
+ *
+ * `min-height: 64px` keeps every row a comfortable tap target even when its
+ * description runs to one short line.
+ */
+.card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 0;
+  border: none;
+  border-bottom: 1px solid var(--ws-line);
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card:hover:not(:disabled) .cardLabel {
+  color: var(--ws-accent);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: -2px;
+}
+
+.card:disabled {
+  cursor: default;
+}
+
+.cardText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cardLabel {
+  font-family: var(--ws-font-body);
+  font-size: calc(17px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  color: var(--ws-ink);
+}
+
+.cardDescription {
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  line-height: calc(1.4 * var(--ws-leading-body));
+  color: var(--ws-ink-faint);
+}
+
+.card:disabled .cardLabel,
+.card:disabled .cardDescription {
+  color: var(--ws-ink-faint);
+  opacity: 0.6;
+}
+
+/*
+ * The figure column, right-aligned.
+ *
+ * `flex: none` with the text column taking the remaining space, so the figures
+ * line up down the page regardless of how long each label runs — that alignment
+ * is the whole reason this is a list of rows.
+ */
+.cardCount {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  text-align: right;
+}
+
+/*
+ * The count is set in the word face, like every other figure in the app — it is
+ * the same visual signal as a Progress stat, which is what makes a number
+ * recognisable as a number before it is read.
+ */
+.cardFigure {
+  font-family: var(--ws-font-word);
+  font-size: calc(21px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-bold);
+  line-height: 1.1;
+  color: var(--ws-ink);
+}
+
+.cardUnit {
+  font-family: var(--ws-font-body);
+  font-size: calc(11px * var(--ws-scale-body));
+  color: var(--ws-ink-faint);
+}
+
+.cardEmpty {
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  color: var(--ws-ink-faint);
+  opacity: 0.7;
+}
+
+/*
+ * Below 380px the question count moves under the word count instead of beside
+ * it. "10 words · 41 questions" is around 22 characters, which at the smallest
+ * supported width leaves the label column too narrow to hold "Longest unused"
+ * on one line.
+ */
+@media (max-width: 380px) {
+  .cardUnit {
+    max-width: 9ch;
+    line-height: 1.3;
+  }
+}
+
+/* Not a test --------------------------------------------------------------- */
+
+/*
+ * The pronunciation list, set apart from the menu above it.
+ *
+ * A small caps label rather than a heading, because this is one item and a
+ * heading would imply a second section of several. The row itself reuses
+ * `.card` so it sits on the same grid as the menu — different in kind, not in
+ * construction.
+ */
+.aside {
+  margin-top: 28px;
+}
+
+.asideLabel {
+  margin: 0 0 2px;
+  font-family: var(--ws-font-body);
+  font-size: calc(11px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}
+
+.aside .card {
+  border-top: 1px solid var(--ws-line);
+}

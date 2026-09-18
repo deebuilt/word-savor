@@ -228,6 +228,37 @@ export default defineConfig(({ mode }) => ({
         // origin, and a request there must reach the function, never the shell.
         // Without this, opening or fetching an `/api` URL is served the app.
         navigateFallbackDenylist: [/^\/api\//],
+        /*
+         * Pronunciation audio, cached the first time it is played.
+         *
+         * `SavedWord.audioUrl` is a link to Merriam-Webster's CDN, not a stored
+         * file, so before this rule every tap on play was a network request:
+         * audio was the one hole in an app whose library is otherwise fully
+         * readable offline, and every replay cost a round trip.
+         *
+         * **CacheFirst, because an MP3 for a word never changes.** There is no
+         * freshness to weigh against the trip — the recording of "obfuscate" is
+         * the recording of "obfuscate". Serve the file and never ask again.
+         *
+         * A year and 300 files are generous bounds rather than tuned ones:
+         * these are a few dozen kilobytes each, the library they follow is a
+         * few hundred words, and the cost of a bound set too tight is the
+         * silence this rule exists to remove.
+         */
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }: { url: URL }) => url.hostname === 'media.merriam-webster.com',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'wordsavor-audio',
+              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              // The CDN answers cross-origin requests opaquely, and an opaque
+              // response has status 0. Without 0 in the list Workbox refuses to
+              // store any of them and the cache stays permanently empty.
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }),
     // Last, so `dist/index.html` is final before it is copied.

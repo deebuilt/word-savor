@@ -353,12 +353,27 @@ export interface PracticeCard {
   isLastForWord: boolean
 }
 
-export function buildPracticeQueue(words: SavedWord[]): PracticeCard[] {
-  const active = shuffle(words.filter((word) => !word.archived))
+/**
+ * The queue, from words already chosen and already in order.
+ *
+ * **The caller decides the order and this only expands each word into its
+ * drills.** It used to shuffle the whole library itself, which was right while
+ * a session *was* the whole library. Once a session became a selection the
+ * shuffle became wrong twice over: a card's order is part of what it selected
+ * ("10 most overdue" means those ten, most overdue first), and a resumed
+ * session re-shuffled would hand back a different run at the same step index.
+ *
+ * `pool` stays the whole library, because distractors should be drawn from
+ * every word there is rather than from the handful being practiced — a
+ * four-word session whose wrong answers are the other three words is a
+ * process-of-elimination test.
+ */
+export function buildQueueFor(words: SavedWord[], pool: SavedWord[]): PracticeCard[] {
   const cards: PracticeCard[] = []
 
-  for (const word of active) {
-    const drills = buildDrillsForWord(word, words)
+  for (const word of words) {
+    if (word.archived) continue
+    const drills = buildDrillsForWord(word, pool)
     drills.forEach((drill, index) => {
       cards.push({ word, drill, isLastForWord: index === drills.length - 1 })
     })

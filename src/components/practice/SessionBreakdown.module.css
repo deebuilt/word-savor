@@ -1,0 +1,102 @@
+/*
+ * One session, word by word.
+ *
+ * The same label-left, figure-right row as Progress and the word detail's
+ * record, so a number is read the same way everywhere in the app. What changes
+ * here is only what the label says.
+ */
+
+.breakdown {
+  margin-top: 4px;
+}
+
+.note {
+  margin: 8px 0 0;
+  max-width: 44ch;
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  color: var(--ws-ink-faint);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ws-line);
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ws-line);
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.word {
+  font-family: var(--ws-font-word);
+  font-size: calc(17px * var(--ws-scale-word));
+  color: var(--ws-ink);
+}
+
+/*
+ * What went wrong, under the word. Wraps rather than clipping — the names of
+ * the drills are the actionable part, and an ellipsis in the middle of "typing
+ * it from its meaning" leaves the reader with "typing it from…".
+ */
+.missed {
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  line-height: calc(1.4 * var(--ws-leading-body));
+  color: var(--ws-ink-faint);
+}
+
+.score {
+  flex: none;
+}
+
+.scoreFigure {
+  font-family: var(--ws-font-word);
+  font-size: calc(17px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-bold);
+  color: var(--ws-ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Words with nothing recorded ---------------------------------------------- */
+
+/*
+ * Run together as a sentence rather than given a row each. They have no figure,
+ * so rows would be a column of blank right-hand cells — and what matters about
+ * them is only which words they were.
+ */
+.untouched {
+  margin-top: 16px;
+}
+
+.untouchedLabel {
+  margin: 0 0 2px;
+  font-family: var(--ws-font-body);
+  font-size: calc(11px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}
+
+.untouchedWords {
+  margin: 0;
+  font-family: var(--ws-font-word);
+  font-size: calc(15px * var(--ws-scale-word));
+  line-height: calc(1.5 * var(--ws-leading-word));
+  color: var(--ws-ink-soft);
+}

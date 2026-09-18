@@ -1,0 +1,45 @@
+/*
+ * The pronunciation button, in one place.
+ *
+ * Lifted verbatim from the two screens that each had their own copy of it, so
+ * the look is unchanged — this is a move, not a redesign. What changes is that
+ * there is now one rule to edit instead of two to keep in step.
+ */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--ws-line);
+  border-radius: 4px;
+  background: none;
+  color: var(--ws-ink-soft);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.button:hover {
+  color: var(--ws-ink);
+  border-color: var(--ws-line-strong);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+}
+
+/*
+ * The larger step, for the pronunciation list where the word is set big and a
+ * 32px control beside it reads as an afterthought. 44px is also the smallest
+ * comfortable tap target, and on that screen the button is the only thing to
+ * tap — every row is there to be played.
+ */
+.buttonLarge {
+  composes: button;
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+}

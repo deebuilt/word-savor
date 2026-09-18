@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Modal, Tag, message } from 'antd'
-import { ArrowLeftOutlined, SoundOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined } from '@ant-design/icons'
 import type { Encounter, SavedWord, Usage } from '../types/domain'
 import {
   deleteWord,
@@ -18,6 +18,7 @@ import { SenseList } from '../components/word/SenseList'
 import { StatusMark } from '../components/word/StatusMark'
 import { WordHistory } from '../components/word/WordHistory'
 import { RelatedWordCard } from '../components/word/RelatedWordCard'
+import { AudioButton } from '../components/word/AudioButton'
 import styles from './WordDetail.module.css'
 
 /**
@@ -455,22 +456,6 @@ function TermTag({ term, onOpen }: { term: string; onOpen: (term: string) => voi
   )
 }
 
-function AudioButton({ src, word }: { src: string; word: string }) {
-  const play = useCallback(() => {
-    void new Audio(src).play().catch(() => {})
-  }, [src])
-
-  return (
-    <button
-      type="button"
-      className={styles.audioButton}
-      onClick={play}
-      aria-label={`Hear ${word} pronounced`}
-    >
-      <SoundOutlined />
-    </button>
-  )
-}
 
 /**
  * A frequency, at a readable number of digits.

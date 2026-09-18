@@ -3,11 +3,13 @@ import type {
   CachedLookup,
   Collection,
   Encounter,
+  PracticeRun,
   PracticeSession,
   SavedWord,
   Usage,
   WordStatus,
 } from '../types/domain'
+import { CURRENT_RUN_KEY } from '../types/domain'
 
 /**
  * Local persistence.
@@ -29,7 +31,18 @@ import type {
  */
 
 const DB_NAME = 'wordsavor'
-const DB_VERSION = 1
+/**
+ * Version 2 adds `runs` — where an unfinished practice session parks its
+ * position so reopening Practice can offer to continue it.
+ *
+ * The argument in the note above ("all six stores are created at version 1,
+ * including the ones nothing read yet") is about stores that could be foreseen.
+ * This one could not: it exists because sessions became resumable, which is a
+ * behaviour rather than a shape. The upgrade is additive and touches nothing
+ * already stored, which is the cheap kind of migration and the reason to make
+ * it rather than to bend an existing store into the job.
+ */
+const DB_VERSION = 2
 
 interface WordSavorDB extends DBSchema {
   words: {
@@ -69,36 +82,57 @@ interface WordSavorDB extends DBSchema {
     value: PracticeSession
     indexes: { 'by-date': number }
   }
+  /**
+   * The one in-progress session's position. At most one row, under
+   * `CURRENT_RUN_KEY` — see `PracticeRun`.
+   */
+  runs: {
+    key: string
+    value: PracticeRun
+  }
 }
 
 let dbPromise: Promise<IDBPDatabase<WordSavorDB>> | undefined
 
 export function getDB(): Promise<IDBPDatabase<WordSavorDB>> {
   dbPromise ??= openDB<WordSavorDB>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      const words = db.createObjectStore('words', { keyPath: 'id' })
-      // `fsrs.due` rather than a top-level copy: idb indexes a nested path
-      // fine, and one source of truth beats two that can drift.
-      words.createIndex('by-due', 'fsrs.due')
-      words.createIndex('by-added', 'addedAt')
-      words.createIndex('by-status', 'status')
-      words.createIndex('by-rarity', 'rarity')
-
-      const encounters = db.createObjectStore('encounters', { keyPath: 'id' })
-      encounters.createIndex('by-word', 'wordId')
-
-      const usages = db.createObjectStore('usages', { keyPath: 'id' })
-      usages.createIndex('by-word', 'wordId')
-      usages.createIndex('by-date', 'at')
-
-      db.createObjectStore('lookups', { keyPath: 'key' })
-      db.createObjectStore('collections', { keyPath: 'id' })
-
-      const sessions = db.createObjectStore('sessions', { keyPath: 'id' })
-      sessions.createIndex('by-date', 'startedAt')
+    /*
+     * Each version's changes sit behind their own guard rather than running
+     * unconditionally. `upgrade` fires once with the version the database is
+     * coming *from*, so a fresh install arrives at `oldVersion === 0` and runs
+     * every block in order, while an existing v1 database runs only the second.
+     * Written as one flat list it would try to re-create the v1 stores on an
+     * upgrading database and throw.
+     */
+    upgrade(db, oldVersion) {
+      if (oldVersion < 1) createV1Stores(db)
+      if (oldVersion < 2) db.createObjectStore('runs', { keyPath: 'key' })
     },
   })
   return dbPromise
+}
+
+function createV1Stores(db: IDBPDatabase<WordSavorDB>): void {
+  const words = db.createObjectStore('words', { keyPath: 'id' })
+  // `fsrs.due` rather than a top-level copy: idb indexes a nested path
+  // fine, and one source of truth beats two that can drift.
+  words.createIndex('by-due', 'fsrs.due')
+  words.createIndex('by-added', 'addedAt')
+  words.createIndex('by-status', 'status')
+  words.createIndex('by-rarity', 'rarity')
+
+  const encounters = db.createObjectStore('encounters', { keyPath: 'id' })
+  encounters.createIndex('by-word', 'wordId')
+
+  const usages = db.createObjectStore('usages', { keyPath: 'id' })
+  usages.createIndex('by-word', 'wordId')
+  usages.createIndex('by-date', 'at')
+
+  db.createObjectStore('lookups', { keyPath: 'key' })
+  db.createObjectStore('collections', { keyPath: 'id' })
+
+  const sessions = db.createObjectStore('sessions', { keyPath: 'id' })
+  sessions.createIndex('by-date', 'startedAt')
 }
 
 /* Words -------------------------------------------------------------------- */
@@ -294,20 +328,29 @@ export async function listAllUsages(): Promise<Usage[]> {
 /* Sessions ----------------------------------------------------------------- */
 
 /**
- * Record a finished practice run.
+ * Write a practice session.
  *
- * Written once, at the moment the session ends, and never updated — a session
- * is a historical fact. This is the row every streak is counted from, so a
- * session that is not written here did not happen as far as Progress is
- * concerned.
+ * **Called after every answer now, not once at the end.** The session takes its
+ * id when the first drill is answered and this re-writes the same row as the
+ * run goes on, so a session abandoned partway keeps everything that was
+ * actually answered. A `put` keyed on `id` overwrites, which is what makes
+ * re-writing free rather than a pile of near-duplicate rows.
+ *
+ * It was `addSession` because it only ever ran once. `putSession` says what it
+ * does under repeated calls, which is the property everything now depends on.
  */
-export async function addSession(session: PracticeSession): Promise<void> {
+export async function putSession(session: PracticeSession): Promise<void> {
   const db = await getDB()
   await db.put('sessions', session)
 }
 
+export async function getSession(id: string): Promise<PracticeSession | undefined> {
+  const db = await getDB()
+  return db.get('sessions', id)
+}
+
 /**
- * Every completed session, newest first.
+ * Every session, newest first.
  *
  * Unbounded on purpose: a streak's *longest* run can be anywhere in the
  * history, so a window would make the headline number wrong the moment the best
@@ -318,6 +361,41 @@ export async function listSessions(): Promise<PracticeSession[]> {
   const db = await getDB()
   const found = await db.getAllFromIndex('sessions', 'by-date')
   return found.reverse()
+}
+
+/* The in-progress run ------------------------------------------------------ */
+
+/**
+ * Park where an unfinished session has got to.
+ *
+ * Written on the same beat as the session row, so the pair never disagrees
+ * about which session is live. Not one transaction with it, deliberately: if
+ * the position write failed and the answers survived, the loss is an offer to
+ * resume, which the reader can live without. The reverse — a resume pointing at
+ * a session whose answers were never stored — would be a run that appears to
+ * continue and has lost its record.
+ */
+export async function putCurrentRun(run: PracticeRun): Promise<void> {
+  const db = await getDB()
+  await db.put('runs', run)
+}
+
+/** The parked run, if a session was left unfinished. */
+export async function getCurrentRun(): Promise<PracticeRun | undefined> {
+  const db = await getDB()
+  return db.get('runs', CURRENT_RUN_KEY)
+}
+
+/**
+ * Forget the parked run.
+ *
+ * Called when a session ends — finished, quit, or replaced by a new one. The
+ * *session* row is untouched: what happened stays, only the offer to continue
+ * goes away.
+ */
+export async function clearCurrentRun(): Promise<void> {
+  const db = await getDB()
+  await db.delete('runs', CURRENT_RUN_KEY)
 }
 
 /* Lookup cache ------------------------------------------------------------- */
