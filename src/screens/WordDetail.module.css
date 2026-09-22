@@ -40,6 +40,19 @@
   margin-right: -10px;
 }
 
+/*
+ * What the word actually has to fit in, so `Word` can size itself to it.
+ *
+ * The screen is 16px of gutter each side and caps at 640px, and this row gives
+ * up the star's 34px plus the 8px between them — the negative margin above
+ * hands 10px of that back. Without this the word would fit itself to the bare
+ * viewport, overshoot by the star's width, and wrap on exactly the long words
+ * the fitting exists to keep on one line.
+ */
+.wordRow > :first-child {
+  --ws-word-fit: calc(min(100vw - 32px, 640px - 32px) - 32px);
+}
+
 .meta {
   display: flex;
   align-items: center;

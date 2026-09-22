@@ -68,3 +68,45 @@
     padding-bottom: 48px;
   }
 }
+
+/*
+ * The way to the word's other meanings, under the card.
+ *
+ * A quiet text control in the body face, matching `DeckOptions` above the card
+ * rather than the bordered arrows below it. Those arrows are the deck's primary
+ * motion and earn their weight; this is an aside you take when something is
+ * wrong, and giving it a third button style would make the foot of the screen
+ * three competing kinds of control.
+ *
+ * Full width with centred text, so the tap target spans the column — it sits
+ * between the card and the arrows, and a narrow target there is easy to miss
+ * and easy to hit by accident on the way to Next.
+ */
+.senses {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 8px;
+  border: none;
+  background: none;
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  color: var(--ws-ink-soft);
+  text-align: center;
+  text-decoration: underline;
+  text-decoration-color: var(--ws-line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.senses:hover {
+  color: var(--ws-accent);
+  text-decoration-color: var(--ws-accent);
+}
+
+.senses:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}

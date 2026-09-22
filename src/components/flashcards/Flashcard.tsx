@@ -1,3 +1,4 @@
+import { Word } from '../word/Word'
 import type { DeckDirection, Flashcard as FlashcardData } from '../../domain/flashcards'
 import styles from './Flashcard.module.css'
 
@@ -30,6 +31,12 @@ import styles from './Flashcard.module.css'
  * reveals the word, and turning it again goes back. A one-way reveal would make
  * it a question you answer rather than a card you look at, which is the line
  * this screen is on the other side of.
+ *
+ * **The word is the shared `Word` at display size**, not type set here. It used
+ * to be the latter, which meant two files defined what a word looks like at its
+ * largest and a change to one silently missed the other — the reason a long
+ * word broke across two lines on this card. The card still owns the *space* the
+ * word is fitted into, since only it knows how wide its own padding leaves it.
  */
 
 interface FlashcardProps {
@@ -71,7 +78,9 @@ export function Flashcard({ card, direction, flipped, onFlip }: FlashcardProps) 
     >
       {showingWord ? (
         <span className={styles.front}>
-          <span className={styles.word}>{card.word.word}</span>
+          <Word size="display" className={styles.word}>
+            {card.word.word}
+          </Word>
           {card.word.pronunciation && (
             <span className={styles.pronunciation}>{card.word.pronunciation}</span>
           )}

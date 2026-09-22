@@ -79,24 +79,22 @@
 /* The front ---------------------------------------------------------------- */
 
 /*
- * The word at display scale. It is one word with a whole screen to itself,
- * which is the largest a word is set anywhere in the app — the same reasoning
- * that sets Audio practice's list word larger than any other list, taken as far
- * as it goes.
+ * The word at display scale — the shared `Word`, which owns the size itself.
  *
- * `overflow-wrap` because a long word at 52px is wider than a 375px viewport,
- * and a word that runs off the edge of its own card is the one failure this
- * screen cannot have.
+ * All this adds is the width the word is being fitted into and a tighter
+ * leading than the default. The card is the only thing on the screen, so it
+ * knows exactly what it leaves the word: its own 24px of padding each side,
+ * inside a deck column that is itself gutter-bound and capped.
+ *
+ * This used to be a full copy of the display word's type, at a fixed 52px.
+ * That is why "circumscribe" broke across two lines here — twelve characters
+ * at 52px is wider than the inside of this card on a phone, and nothing was
+ * watching for that. The word is now set to whatever size clears the padding.
  */
 .word {
-  font-family: var(--ws-font-word);
-  font-size: calc(52px * var(--ws-scale-word));
-  font-weight: var(--ws-weight-word-bold);
+  --ws-word-fit: calc(min(100vw - 32px, 608px) - 48px);
   line-height: calc(1.05 * var(--ws-leading-word));
   letter-spacing: -0.02em;
-  color: var(--ws-ink);
-  overflow-wrap: anywhere;
-  hyphens: auto;
 }
 
 .pronunciation {

@@ -1,0 +1,38 @@
+/*
+ * The sheet's own type. Everything inside the list is `SenseList`'s.
+ */
+
+/*
+ * The word in the modal's title slot, set at title scale.
+ *
+ * `--ws-word-fit` is the modal's content width — Ant's default 520px, less its
+ * 24px of body padding each side — so a long word fits itself to the sheet
+ * rather than to the viewport behind it, which is wider. Capped against the
+ * small-screen case, where the modal is the viewport less its 16px margins.
+ */
+.title {
+  --ws-word-fit: calc(min(100vw - 32px, 520px) - 48px);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/*
+ * One line saying what the stars do.
+ *
+ * The star is an outline until it is filled and nothing else on this sheet
+ * explains it. On the detail screen the surrounding page gives it context; here
+ * the reader has arrived from a card, mid-deck, for one purpose, and a bare
+ * list of definitions with a row of unexplained outlines beside them does not
+ * say which one is the current choice or what tapping would do.
+ */
+.lead {
+  margin: 0;
+  font-family: var(--ws-font-body);
+  font-size: calc(14px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  color: var(--ws-ink-soft);
+}

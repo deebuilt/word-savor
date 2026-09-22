@@ -11,6 +11,41 @@
  * Atkinson Hyperlegible and OpenDyslexic jump 400 to 700 with nothing between,
  * so a hardcoded 600 would be browser-synthesised on exactly the two faces
  * chosen for legibility.
+ *
+ * ---------------------------------------------------------------------------
+ *
+ * **A word is sized to fit, not set to a number.**
+ *
+ * The sizes below are ceilings rather than fixed values. Every one of them is
+ * a `clamp()` whose preferred value is the largest size this particular word
+ * can be and still sit on one line — so a short word is pinned to the full
+ * display size by the ceiling, and a long one quietly steps down toward the
+ * floor instead of breaking.
+ *
+ * This replaces sizes that were simply fixed, which made whether a word fit a
+ * matter of luck: "circumscribe" is twelve characters, and at 52px in Fraunces
+ * that is wider than the inside of a card on a 375px screen, so it wrapped —
+ * and because `overflow-wrap: anywhere` breaks wherever it runs out of room
+ * rather than at a syllable, it broke as "circum-/scribe" on the flashcard and
+ * on the "e" in the library. One cause, two symptoms, and no size that fixes
+ * it for both a four-letter word and a twenty-letter one.
+ *
+ * The fitted size is `available width ÷ characters ÷ average character width`.
+ * `--ws-word-length` is the character count, handed down by the component
+ * because CSS cannot count. `--ws-word-fit` is the width the word has to work
+ * in, which only the screen placing it knows — a library row gives up space to
+ * a rarity band and two status dots, the detail header to a star — so each
+ * caller sets it and the default below is the bare viewport.
+ *
+ * 0.52em is the average advance width of a lowercase character in Fraunces at
+ * these sizes, measured across the saved vocabulary rather than guessed. It is
+ * deliberately a hair generous: overshooting shrinks a word that would have
+ * fit, undershooting lets one wrap, and only the second is a bug worth seeing.
+ *
+ * `overflow-wrap` stays as the floor under all of this. The fitted size has a
+ * minimum — past a certain point shrinking stops being legible and the honest
+ * answer is to break the word — so a truly enormous word still wraps. It just
+ * takes a genuinely enormous word to get there now, rather than "circumscribe".
  */
 
 .word {
@@ -19,9 +54,36 @@
   font-weight: var(--ws-weight-word-bold);
   line-height: calc(1.15 * var(--ws-leading-word));
   color: var(--ws-ink);
-  /* A long word must break rather than widen its container past the viewport —
-     "incomprehensibilities" at display size is wider than a 375px screen. */
+  /*
+   * The floor under the fitting above. A word long enough to hit its minimum
+   * size still has to break somewhere, and `hyphens` asks the browser to pick
+   * a syllable and mark the break — "incomprehen-/sibilities" rather than the
+   * mid-letter split `overflow-wrap` gives on its own. `overflow-wrap` stays
+   * behind it for the word no dictionary can hyphenate, where running off the
+   * edge of the screen is the worse failure.
+   */
+  hyphens: auto;
   overflow-wrap: anywhere;
+
+  /*
+   * The space the word is being fitted into. Overridden by any screen that
+   * knows better; the default assumes the word owns the viewport minus the
+   * 16px page gutters, which is true of the widest case and conservative
+   * everywhere else.
+   */
+  --ws-word-fit: calc(100vw - 32px);
+
+  /*
+   * The size at which this word exactly fills the width it has been given.
+   *
+   * Written as a single `calc` on purpose. A custom property used as a divisor
+   * has to resolve to a plain number, and a nested `max()` in that position is
+   * a token list rather than a computed value — which makes the whole
+   * expression invalid, drops the `font-size`, and silently inherits the body
+   * face. The `max(1, …)` guard against a missing or zero count therefore sits
+   * inside this one expression, where it divides cleanly.
+   */
+  --ws-word-fitted: calc(var(--ws-word-fit) / max(1, var(--ws-word-length, 1)) / 0.52);
 }
 
 /*
@@ -30,22 +92,50 @@
  * `display` is the word alone on the detail screen, large enough to be the
  * subject of the page. `title` heads a result. `row` is the library list.
  * `inline` sits inside running text — a related word, a synonym chip.
+ *
+ * Each floor is the size below which shrinking stops helping. A display word
+ * that has fallen to 28px is no longer the subject of its screen, so past that
+ * it is better to let it wrap and stay readable than to keep shrinking it
+ * toward the body text.
  */
 .display {
-  font-size: calc(52px * var(--ws-scale-word));
+  font-size: clamp(
+    calc(28px * var(--ws-scale-word)),
+    var(--ws-word-fitted),
+    calc(52px * var(--ws-scale-word))
+  );
   letter-spacing: -0.025em;
 }
 
 .title {
-  font-size: calc(38px * var(--ws-scale-word));
+  font-size: clamp(
+    calc(24px * var(--ws-scale-word)),
+    var(--ws-word-fitted),
+    calc(38px * var(--ws-scale-word))
+  );
   letter-spacing: -0.02em;
 }
 
+/*
+ * The row floor is high and close to its ceiling on purpose. A library is read
+ * by scanning down a column, and a column whose type size changes line to line
+ * is harder to scan than one with a single long word wrapping in it. So a row
+ * word shrinks by a few points to save a wrap and no further.
+ */
 .row {
-  font-size: calc(21px * var(--ws-scale-word));
+  font-size: clamp(
+    calc(17px * var(--ws-scale-word)),
+    var(--ws-word-fitted),
+    calc(21px * var(--ws-scale-word))
+  );
   letter-spacing: -0.01em;
 }
 
+/*
+ * No fitting inline: this one sits in a sentence, where matching the text
+ * around it matters more than staying on one line, and a word that changed
+ * size mid-paragraph would read as an error.
+ */
 .inline {
   display: inline;
   font-size: calc(17px * var(--ws-scale-word));
@@ -53,16 +143,27 @@
 }
 
 /*
- * The display size is set for a phone first. Below 380px a long word at 52px
- * still crowds the edges even with `overflow-wrap`, so it steps down — the word
- * should command the screen, not fight it.
+ * Below 380px the ceilings come down as well.
+ *
+ * Fitting already keeps a long word on one line at any width, so this is no
+ * longer rescuing anything — it is a composition decision. A short word at
+ * 52px on a 360px screen leaves almost no margin beside it, and the word
+ * should command the screen rather than fill it edge to edge.
  */
 @media (max-width: 380px) {
   .display {
-    font-size: calc(42px * var(--ws-scale-word));
+    font-size: clamp(
+      calc(26px * var(--ws-scale-word)),
+      var(--ws-word-fitted),
+      calc(42px * var(--ws-scale-word))
+    );
   }
 
   .title {
-    font-size: calc(32px * var(--ws-scale-word));
+    font-size: clamp(
+      calc(22px * var(--ws-scale-word)),
+      var(--ws-word-fitted),
+      calc(32px * var(--ws-scale-word))
+    );
   }
 }

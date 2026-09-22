@@ -240,12 +240,31 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
+  /* The measuring stick for the word beside the markers — see `.rowWord`. */
+  container-type: inline-size;
 }
 
 .rowWord {
   flex: 1;
   min-width: 0;
   transition: color 120ms ease;
+
+  /*
+   * The word fits itself to the row's width, less what the markers beside it
+   * take.
+   *
+   * `100cqw` is the row's inline size, measured rather than assumed — the row
+   * is the container, declared on `.rowTop`, because an element cannot query
+   * its own width to decide its own font size without the two chasing each
+   * other. The subtraction is what the right-hand side costs: the rarity band
+   * at its widest label, the status marks, and the 8px gaps between them.
+   *
+   * An estimate, unlike the other screens, and deliberately a generous one. A
+   * row is the one place a wrap is cheap — the list keeps scanning either way —
+   * so it is better to under-shrink a word here than to shrink every word in a
+   * long column to clear a band that most rows do not even show.
+   */
+  --ws-word-fit: calc(100cqw - 108px);
 }
 
 /*

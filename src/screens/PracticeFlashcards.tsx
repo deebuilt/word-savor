@@ -10,6 +10,7 @@ import {
   type DeckScope,
 } from '../domain/flashcards'
 import { Flashcard } from '../components/flashcards/Flashcard'
+import { SenseSheet } from '../components/flashcards/SenseSheet'
 import { DeckControls } from '../components/flashcards/DeckControls'
 import { DeckOptions } from '../components/flashcards/DeckOptions'
 import { ScopeSwitch } from '../components/flashcards/ScopeSwitch'
@@ -42,6 +43,14 @@ import styles from './PracticeFlashcards.module.css'
  * That resolver is the reason the favourite-definition work was built first: a
  * flashcard drilling the dictionary's first sense while the library row shows
  * the starred one is the app disagreeing with itself about what a word means.
+ *
+ * **The starred sense can be changed from here, without leaving.** Noticing the
+ * wrong meaning on a card is exactly the moment you want to fix it, and the
+ * only way used to be the word's own screen — which unmounts all of the state
+ * above and deals a fresh deck from card 1 on the way back. `SenseSheet` opens
+ * over the deck instead, so nothing here is disturbed: see its own note. The
+ * edited word is merged into `edits` below rather than re-read, because the
+ * pool this screen is handed is a snapshot taken once when Practice mounted.
  */
 
 interface PracticeFlashcardsProps {
@@ -67,6 +76,27 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
 
+  /** The word whose senses are open over the deck, if any. */
+  const [openWordId, setOpenWordId] = useState<string | undefined>(undefined)
+
+  /*
+   * Words edited from the sheet, by id, layered over the pool.
+   *
+   * **The pool is a snapshot, not a subscription.** `usePracticeRun` reads the
+   * library once when Practice mounts and holds it; the refresh token that
+   * Library and Progress listen to does not reach it. So a star moved in the
+   * sheet is on disk and in the library, and the deck would still be dealing
+   * the word as it was when this tab was opened — the card would show the old
+   * meaning until the whole tab remounted, which is exactly the confusion the
+   * sheet exists to remove.
+   *
+   * Held here rather than pushed up into the run, because this is the one
+   * screen that can make such an edit and the run's pool is shared with the
+   * scored drills, where swapping a word mid-session would change the question
+   * underneath the reader.
+   */
+  const [edits, setEdits] = useState<ReadonlyMap<string, SavedWord>>(() => new Map())
+
   /*
    * The shuffled sequence, as ids, held across renders.
    *
@@ -83,9 +113,22 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
    */
   const [shuffled, setShuffled] = useState<readonly string[] | undefined>(undefined)
 
+  /*
+   * The library this screen deals from: the pool with any local edits applied.
+   *
+   * Everything below derives from `library` rather than `words`, so a star
+   * moved in the sheet reaches the deck, both scope counts and the excluded
+   * tally in one place. Identity is preserved when nothing has been edited, so
+   * the memo below still only rebuilds when the pool itself changes.
+   */
+  const library = useMemo(() => {
+    if (edits.size === 0) return words
+    return words.map((word) => edits.get(word.id) ?? word)
+  }, [words, edits])
+
   const deck = useMemo(
-    () => buildDeck(words, scope, order, shuffled),
-    [words, scope, order, shuffled],
+    () => buildDeck(library, scope, order, shuffled),
+    [library, scope, order, shuffled],
   )
 
   /*
@@ -94,8 +137,8 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
    * is built with, so the number on the tab is the number of cards behind it.
    */
   const counts = useMemo(
-    () => ({ all: countDeck(words, 'all'), favorites: countDeck(words, 'favorites') }),
-    [words],
+    () => ({ all: countDeck(library, 'all'), favorites: countDeck(library, 'favorites') }),
+    [library],
   )
 
   /*
@@ -110,8 +153,8 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
    */
   const excluded = useMemo(() => {
     if (scope !== 'all') return 0
-    return words.filter((word) => !word.archived).length - counts.all
-  }, [words, scope, counts.all])
+    return library.filter((word) => !word.archived).length - counts.all
+  }, [library, scope, counts.all])
 
   /*
    * Moving lands on the front of the next card.
@@ -162,9 +205,9 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
    * to their words.
    */
   const reshuffle = useCallback(() => {
-    setShuffled(shuffleIds(scopeWords(words, scope)))
+    setShuffled(shuffleIds(scopeWords(library, scope)))
     go(0)
-  }, [words, scope, go])
+  }, [library, scope, go])
 
   const changeOrder = useCallback(
     (next: DeckOrder) => {
@@ -176,11 +219,11 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
        * you to where you were, and Again is there for when it should not.
        */
       if (next === 'shuffled' && !shuffled) {
-        setShuffled(shuffleIds(scopeWords(words, scope)))
+        setShuffled(shuffleIds(scopeWords(library, scope)))
       }
       go(0)
     },
-    [words, scope, shuffled, go],
+    [library, scope, shuffled, go],
   )
 
   /*
@@ -191,6 +234,17 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
   const changeDirection = useCallback((next: DeckDirection) => {
     setDirection(next)
     setFlipped(false)
+  }, [])
+
+  /*
+   * Record a word edited in the sheet, so the deck shows it at once.
+   *
+   * Merged into `edits` rather than written back to the pool — see that state's
+   * note. `onSaved` has already put it on disk and told the rest of the app; it
+   * is only this screen's own copy that needs catching up.
+   */
+  const applyEdit = useCallback((edited: SavedWord) => {
+    setEdits((current) => new Map(current).set(edited.id, edited))
   }, [])
 
   /*
@@ -211,6 +265,23 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
   const card = deck[position]
 
   /*
+   * The word the sheet is showing, resolved from the edited library.
+   *
+   * Looked up by id every render rather than held as the word itself, so the
+   * sheet is always handed the current copy — an object captured when the sheet
+   * opened would go stale the moment a star was moved in it.
+   *
+   * Resolved against `library` rather than `deck`, because a word can leave the
+   * deck while its sheet is open: un-star the last favourite in the Favorites
+   * scope and the deck empties, but the sheet is still on screen and still has
+   * a word to show.
+   */
+  const openWord = useMemo(
+    () => (openWordId ? library.find((word) => word.id === openWordId) : undefined),
+    [library, openWordId],
+  )
+
+  /*
    * Write the clamp back when it actually bit, so state and screen do not hold
    * two different positions.
    *
@@ -228,6 +299,14 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
    * intercepting them here would double-fire the flip.
    */
   useEffect(() => {
+    /*
+     * Not while the sheet is open. The listener is on the window, so an arrow
+     * key pressed while reading the senses would page the deck underneath —
+     * and since moving resets the flip and the sheet is keyed to the word it
+     * opened on, the reader would close it to find a different card.
+     */
+    if (openWordId) return
+
     function onKey(event: KeyboardEvent) {
       if (event.key === 'ArrowLeft' && position > 0) go(position - 1)
       if (event.key === 'ArrowRight' && position < deck.length - 1) go(position + 1)
@@ -235,7 +314,7 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [position, deck.length, go])
+  }, [position, deck.length, go, openWordId])
 
   return (
     <div className={styles.screen}>
@@ -258,6 +337,30 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
             onFlip={() => setFlipped((on) => !on)}
           />
 
+          {/*
+            The way to the word's other meanings.
+
+            Its own line under the card rather than a control on it: the card is
+            a single button whose entire surface flips, so a nested button would
+            be invalid markup and a tap on it would flip the card as well. Under
+            the card and above the arrows puts it where the definition was a
+            moment ago, which is where the reader is looking when they decide
+            this is the wrong meaning.
+
+            Labelled with the count, so it says whether there is anything to
+            switch *to* before it is opened — a word with one sense offers a
+            sheet that can only confirm what the card already showed.
+          */}
+          <button
+            type="button"
+            className={styles.senses}
+            onClick={() => setOpenWordId(card.word.id)}
+          >
+            {card.word.senses.length > 1
+              ? `See all ${card.word.senses.length} meanings`
+              : 'See the meaning'}
+          </button>
+
           <DeckControls
             index={position}
             total={deck.length}
@@ -279,6 +382,18 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
             : 'Nothing to page through yet. Save a few words in Look Up and they will show up here.'}
         </p>
       )}
+
+      {/*
+        Outside the `card` branch, so the sheet is not unmounted by the deck
+        changing underneath it — un-starring the last favourite while in the
+        Favorites scope empties the deck, and a sheet that vanished mid-tap
+        would take its own "could not save" toast with it.
+      */}
+      <SenseSheet
+        word={openWord}
+        onClose={() => setOpenWordId(undefined)}
+        onSaved={applyEdit}
+      />
     </div>
   )
 }
