@@ -5,6 +5,7 @@ import { LookUpRoute } from './routes/LookUpRoute'
 import { MoreRoute } from './routes/MoreRoute'
 import { PracticeRoute } from './routes/PracticeRoute'
 import { PracticeDoneRoute } from './routes/PracticeDoneRoute'
+import { PracticeFlashcardsRoute } from './routes/PracticeFlashcardsRoute'
 import { PracticePickRoute } from './routes/PracticePickRoute'
 import { PracticeResultsRoute } from './routes/PracticeResultsRoute'
 import { PracticeSessionRoute } from './routes/PracticeSessionRoute'
@@ -56,8 +57,8 @@ export const router = createBrowserRouter([
       { path: 'library/:wordId', element: <WordDetailRoute /> },
       { path: 'lookup', element: <LookUpRoute /> },
       /*
-       * Practice is a layout with four screens under it, rather than one route
-       * holding four kinds of state. The layout owns the run — see
+       * Practice is a layout with several screens under it, rather than one
+       * route holding several kinds of state. The layout owns the run — see
        * `PracticeRoute` — so moving between the menu, the session and the end
        * screen does not unmount what is being practiced.
        *
@@ -74,6 +75,7 @@ export const router = createBrowserRouter([
           { index: true, element: <PracticeStartRoute /> },
           { path: 'choose', element: <PracticePickRoute /> },
           { path: 'speak', element: <PracticeSpeakRoute /> },
+          { path: 'cards', element: <PracticeFlashcardsRoute /> },
           { path: 'session', element: <PracticeSessionRoute /> },
           { path: 'done', element: <PracticeDoneRoute /> },
           { path: 'results/:sessionId', element: <PracticeResultsRoute /> },

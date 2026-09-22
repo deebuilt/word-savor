@@ -1,0 +1,111 @@
+/*
+ * The quiet row: direction and order, on one line under the scope tabs.
+ *
+ * Deliberately low-contrast, but not small. These are adjustments a reader
+ * makes mid-deck, so they have to be findable and tappable on a phone — the
+ * first pass set them at caption size and they read as a label rather than a
+ * control. What keeps them from competing with the card is the weight and the
+ * colour, not the size.
+ *
+ * `flex-wrap` so the row breaks rather than overflowing if a face runs large:
+ * the reading-face setting can scale this text up, and two long labels plus
+ * "Again" on a 375px viewport is the case where it would otherwise clip.
+ */
+
+.options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-bottom: 16px;
+}
+
+/*
+ * A text button, not a bordered control. `min-height` rather than padding to
+ * reach a tappable size, so the row stays visually tight while the target
+ * stays a thumb's worth — the label sits on the same baseline it would have
+ * without it.
+ */
+.option {
+  display: inline-flex;
+  align-items: center;
+  /*
+   * 40px, not the 32 this started at. These are the two controls on the screen
+   * a reader actually reaches for mid-deck, and at 13px they read as a caption
+   * rather than something to tap — small enough on a phone that finding them
+   * takes aim. Still short of the 44px `control.minTouchTarget` the nav uses,
+   * because that figure is for a target you hit without looking; this is one
+   * you are already looking at, and 44 would put a gap under the tabs that the
+   * card needs.
+   */
+  min-height: 40px;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  font-family: var(--ws-font-body);
+  font-size: calc(15px * var(--ws-scale-body));
+  color: var(--ws-ink-soft);
+  /*
+   * Underlined, because an unadorned word in a row of text does not read as
+   * tappable. A dotted underline says "this changes" without borrowing the
+   * solid underline the scope tabs use for "you are here".
+   */
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--ws-line-strong);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.option:hover {
+  color: var(--ws-accent);
+  text-decoration-color: var(--ws-accent);
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.divider {
+  color: var(--ws-ink-faint);
+  font-size: calc(15px * var(--ws-scale-body));
+  opacity: 0.6;
+}
+
+/*
+ * "Again" is an action, not a state, so it is set apart from the two toggles
+ * rather than reading as a third thing you can be. `margin-left: auto` pushes
+ * it to the end of the row — and it collapses harmlessly when the row wraps.
+ */
+.reshuffle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 40px;
+  margin-left: auto;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  font-family: var(--ws-font-body);
+  /*
+   * A step below the two toggles beside it. It is an action rather than a
+   * state, and it is tapped far less often — matching their size would give a
+   * secondary control equal billing.
+   */
+  font-size: calc(14px * var(--ws-scale-body));
+  color: var(--ws-accent);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.reshuffle:hover {
+  background: var(--ws-accent-soft);
+}
+
+.reshuffle:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+}

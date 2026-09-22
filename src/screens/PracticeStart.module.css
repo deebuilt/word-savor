@@ -232,15 +232,21 @@
   }
 }
 
-/* Not a test --------------------------------------------------------------- */
+/* Quiet practice ----------------------------------------------------------- */
 
 /*
- * The pronunciation list, set apart from the menu above it.
+ * The unscored ways to practice, set apart from the menu above them.
  *
- * A small caps label rather than a heading, because this is one item and a
- * heading would imply a second section of several. The row itself reuses
- * `.card` so it sits on the same grid as the menu — different in kind, not in
- * construction.
+ * **Still a small-caps label rather than a real heading, but for a new
+ * reason.** It used to be a label because the section held one item and a
+ * heading would have implied a second section of several. It holds two now, so
+ * that argument has expired — what keeps it small is that the menu above has no
+ * heading at all, and giving this group a full heading would make the unscored
+ * pair look like the titled part of the screen and the seven real sessions like
+ * a preamble. The label is the lightest thing that names a group.
+ *
+ * The rows reuse `.card`, so they sit on the same grid as the menu — different
+ * in kind, not in construction.
  */
 .aside {
   margin-top: 28px;
@@ -256,6 +262,14 @@
   color: var(--ws-ink-faint);
 }
 
-.aside .card {
+/*
+ * A list, like the menu, now that there is more than one row. The top rule
+ * lives here rather than on the first `.card` — with two rows, a rule per card
+ * would double up between them.
+ */
+.asideList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   border-top: 1px solid var(--ws-line);
 }

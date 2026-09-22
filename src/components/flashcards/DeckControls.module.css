@@ -1,0 +1,85 @@
+/*
+ * The way through the deck, at the foot of the screen.
+ *
+ * Both buttons are in thumb reach at the bottom rather than beside the card,
+ * because on a phone the sides of the screen at card height are where the hand
+ * holding the phone already is. The position sits between them so the two
+ * arrows are as far apart as the row allows — adjacent arrows are the classic
+ * way to tap the wrong one.
+ */
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+/*
+ * 48px square: above the 44px minimum touch target, and square rather than
+ * wide so the two never grow into each other on a narrow viewport.
+ */
+.step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--ws-line-strong);
+  border-radius: 4px;
+  background: var(--ws-paper-raised);
+  color: var(--ws-ink);
+  font-size: 15px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.step:hover:not(:disabled) {
+  border-color: var(--ws-accent);
+  color: var(--ws-accent);
+}
+
+.step:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+}
+
+/*
+ * A disabled end button is dimmed and stays put. Removing it would shift the
+ * position figure sideways on the first and last card, which is movement with
+ * no meaning behind it.
+ */
+.step:disabled {
+  color: var(--ws-ink-faint);
+  border-color: var(--ws-line);
+  opacity: 0.5;
+  cursor: default;
+}
+
+.position {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin: 0;
+}
+
+/*
+ * The figure in the word face, like every other number in this app — a Progress
+ * stat, a practice menu count, and this all read as numbers before they are
+ * read as values.
+ */
+.figure {
+  font-family: var(--ws-font-word);
+  font-size: calc(21px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-bold);
+  line-height: 1.1;
+  color: var(--ws-ink);
+}
+
+.total {
+  font-family: var(--ws-font-body);
+  font-size: calc(13px * var(--ws-scale-body));
+  color: var(--ws-ink-faint);
+}

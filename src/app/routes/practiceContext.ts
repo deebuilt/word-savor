@@ -5,7 +5,12 @@ import type { ResumeOffer } from '../../practice/usePracticeRun'
 import type { UsageGrade } from '../../domain/scheduler'
 
 /**
- * The live run, shared by the four screens under `/practice`.
+ * The live run, shared by the screens under `/practice`.
+ *
+ * Not every screen under the layout reads the run — the unscored two, Audio
+ * practice and Flashcards, take only `pool`. They still live here because they
+ * are ways to practice and belong under that address, not because they have a
+ * session to share.
  *
  * Context rather than props because a route element takes no props from
  * whatever decided to render it — the same reason the refresh tokens moved here

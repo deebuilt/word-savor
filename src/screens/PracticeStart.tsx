@@ -7,6 +7,7 @@ import {
   isPracticable,
   type PracticeCardDefinition,
 } from '../domain/practiceSelection'
+import { countDeck } from '../domain/flashcards'
 import type { ResumeOffer } from '../practice/usePracticeRun'
 import styles from './PracticeStart.module.css'
 
@@ -45,6 +46,7 @@ interface PracticeStartProps {
   onResume: () => void
   onHandPick: () => void
   onSpeak: () => void
+  onFlashcards: () => void
 }
 
 export function PracticeStart({
@@ -54,6 +56,7 @@ export function PracticeStart({
   onResume,
   onHandPick,
   onSpeak,
+  onFlashcards,
 }: PracticeStartProps) {
   /*
    * Only words that can actually carry a session.
@@ -94,6 +97,18 @@ export function PracticeStart({
     () => words.filter((word) => Boolean(word.audioUrl)).length,
     [words],
   )
+
+  /*
+   * How many words the flashcard deck would deal. Counted through the deck's
+   * own builder rather than from `words.length`, so the figure on the card is
+   * the figure behind it — a word with no definition saved has no back and is
+   * not dealt, the same way a word with no recording is left out above.
+   *
+   * From the whole library, not `practicable`: a card needs a definition and
+   * nothing else. A word the drill builders cannot make a question out of still
+   * has a meaning worth looking at.
+   */
+  const deckSize = useMemo(() => countDeck(words, 'all'), [words])
 
   /** Every card's selection, resolved once. */
   const previews = useMemo(
@@ -146,30 +161,68 @@ export function PracticeStart({
       </ul>
 
       {/*
-       * Saying the words is below the menu and under its own heading, because
-       * it is a different kind of thing: nothing is scored, nothing is written,
-       * and there is no session to finish. Put in the list above it would be an
-       * eighth way to be tested, which is the one thing it is not — and the
-       * counts beside every other row would be promising a length it does not
-       * have.
+       * The unscored ways to practice, below the menu and under their own
+       * heading, because they are a different kind of thing: nothing is scored,
+       * nothing is written, and there is no session to finish. Put in the list
+       * above, either would be an eighth way to be tested — which is the one
+       * thing neither is — and the counts beside every other row would be
+       * promising a length they do not have.
+       *
+       * **"Quiet practice", not "Not a test".** The old label was a disclaimer,
+       * which worked over a single item and fails as a heading over two: it
+       * says what the section is not and leaves the reader to infer the
+       * category. The reasoning for having the section at all is unchanged.
+       *
+       * **Flashcards are one card, not two, and carry no toggle.** The set —
+       * all words, or the favourites — is chosen inside the deck, because a
+       * toggle here would turn an entry point into a settings row, and this
+       * screen's whole premise is that tapping a card *is* the choice. Two
+       * cards would be the same verb twice with a filter attached. See
+       * `docs/flashcards-plan.md`.
        */}
-      {audible > 0 && (
+      {(audible > 0 || deckSize > 0) && (
         <div className={styles.aside}>
-          <p className={styles.asideLabel}>Not a test</p>
-          <button type="button" className={styles.card} onClick={onSpeak}>
-            <span className={styles.cardText}>
-              <span className={styles.cardLabel}>Audio practice</span>
-              <span className={styles.cardDescription}>
-                Listen and repeat. Nothing is scored.
-              </span>
-            </span>
-            <span className={styles.cardCount}>
-              <span className={styles.cardFigure}>{audible}</span>
-              <span className={styles.cardUnit}>
-                {audible === 1 ? 'word' : 'words'}
-              </span>
-            </span>
-          </button>
+          <p className={styles.asideLabel}>Quiet practice</p>
+
+          <ul className={styles.asideList}>
+            {audible > 0 && (
+              <li>
+                <button type="button" className={styles.card} onClick={onSpeak}>
+                  <span className={styles.cardText}>
+                    <span className={styles.cardLabel}>Audio practice</span>
+                    <span className={styles.cardDescription}>
+                      Listen and repeat. Nothing is scored.
+                    </span>
+                  </span>
+                  <span className={styles.cardCount}>
+                    <span className={styles.cardFigure}>{audible}</span>
+                    <span className={styles.cardUnit}>
+                      {audible === 1 ? 'word' : 'words'}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            )}
+
+            {deckSize > 0 && (
+              <li>
+                <button type="button" className={styles.card} onClick={onFlashcards}>
+                  <span className={styles.cardText}>
+                    <span className={styles.cardLabel}>Flashcards</span>
+                    <span className={styles.cardDescription}>
+                      The word, then what you starred it for.
+                    </span>
+                  </span>
+                  <span className={styles.cardCount}>
+                    <span className={styles.cardFigure}>{deckSize}</span>
+                    <span className={styles.cardUnit}>
+                      {deckSize === 1 ? 'word' : 'words'}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            )}
+          </ul>
         </div>
       )}
     </div>

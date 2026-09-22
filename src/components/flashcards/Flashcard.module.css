@@ -1,0 +1,173 @@
+/*
+ * The card.
+ *
+ * It is the screen, not a tile on it. At 375px there is room for exactly one
+ * thing to matter, and on this screen that is the word — so the card takes the
+ * height between the deck's header and its controls rather than sitting in the
+ * middle of it at a polite size. That also makes the flip a thumb tap anywhere
+ * in the reading area instead of a target to aim at.
+ *
+ * A hairline border and the raised paper, not a shadow: a drop-shadowed
+ * rounded rectangle floating on a page is the card-on-page look this design
+ * avoids everywhere else, and there is no reason for the one screen literally
+ * about cards to be where it creeps back in.
+ */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  /*
+   * Grows into whatever the deck's flex column leaves it, with a floor so the
+   * card never collapses to its text on a short viewport. The floor is what
+   * keeps a one-word front and a four-line back the same size — a card that
+   * resized as it turned over would make the flip feel like a layout jump.
+   */
+  flex: 1;
+  min-height: 320px;
+  padding: 32px 24px 48px;
+  position: relative;
+  border: 1px solid var(--ws-line);
+  border-radius: 4px;
+  background: var(--ws-paper-raised);
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+}
+
+/*
+ * Both faces cross-fade in. Same duration as every other transition in the app,
+ * and deliberately not a rotation — see the component's note.
+ */
+.front,
+.back {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  animation: turn 200ms ease-out;
+}
+
+@keyframes turn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * Motion is a preference, and the fade is decoration rather than information —
+ * the card's content changes either way.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .front,
+  .back {
+    animation: none;
+  }
+}
+
+/* The front ---------------------------------------------------------------- */
+
+/*
+ * The word at display scale. It is one word with a whole screen to itself,
+ * which is the largest a word is set anywhere in the app — the same reasoning
+ * that sets Audio practice's list word larger than any other list, taken as far
+ * as it goes.
+ *
+ * `overflow-wrap` because a long word at 52px is wider than a 375px viewport,
+ * and a word that runs off the edge of its own card is the one failure this
+ * screen cannot have.
+ */
+.word {
+  font-family: var(--ws-font-word);
+  font-size: calc(52px * var(--ws-scale-word));
+  font-weight: var(--ws-weight-word-bold);
+  line-height: calc(1.05 * var(--ws-leading-word));
+  letter-spacing: -0.02em;
+  color: var(--ws-ink);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.pronunciation {
+  font-family: var(--ws-font-body);
+  font-size: calc(15px * var(--ws-scale-body));
+  color: var(--ws-ink-faint);
+}
+
+/* The back ----------------------------------------------------------------- */
+
+/*
+ * The definition reads as prose, so it is left-aligned and capped at the same
+ * 44ch every other block of prose in this app uses. Centred definition text
+ * looks composed for one line and falls apart at three.
+ */
+.back {
+  align-items: flex-start;
+  max-width: 44ch;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.partOfSpeech {
+  font-family: var(--ws-font-body);
+  font-size: calc(12px * var(--ws-scale-body));
+  font-weight: var(--ws-weight-body-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+}
+
+/*
+ * Set in the body face, not the word face. The word is the content on this
+ * screen; the definition is what explains it, and the app's two faces are
+ * divided on exactly that line everywhere else.
+ */
+.definition {
+  font-family: var(--ws-font-body);
+  font-size: calc(19px * var(--ws-scale-body));
+  line-height: calc(1.5 * var(--ws-leading-body));
+  color: var(--ws-ink);
+}
+
+/* ------------------------------------------------------------------------- */
+
+/*
+ * Pinned to the foot of the card rather than placed in the column, so the word
+ * stays optically centred — a hint in the flow would push it up by its own
+ * height and the card would look top-heavy.
+ */
+.hint {
+  position: absolute;
+  bottom: 16px;
+  left: 0;
+  right: 0;
+  font-family: var(--ws-font-body);
+  font-size: calc(11px * var(--ws-scale-body));
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ws-ink-faint);
+  opacity: 0.8;
+}
+
+/*
+ * A taller card once there is height to spend. The floor above is set for a
+ * small phone in landscape; a normal portrait phone has far more room and a
+ * card that stops at 320px in the middle of it reads as an element on a page
+ * rather than the thing you are looking at.
+ */
+@media (min-height: 640px) {
+  .card {
+    min-height: 400px;
+  }
+}

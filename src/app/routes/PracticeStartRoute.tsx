@@ -18,6 +18,7 @@ export function PracticeStartRoute() {
       onResume={resume}
       onHandPick={() => void navigate('/practice/choose')}
       onSpeak={() => void navigate('/practice/speak')}
+      onFlashcards={() => void navigate('/practice/cards')}
     />
   )
 }

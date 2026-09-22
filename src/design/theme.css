@@ -33,6 +33,25 @@
   --ws-success-soft: #e6efe7;
   --ws-danger: #8c3a30;
   --ws-shadow: rgba(22, 19, 15, 0.10);
+
+  /*
+   * How much vertical room the bottom bar takes, including the safe-area inset
+   * it pads itself with on a notched phone.
+   *
+   * Here rather than in one screen's stylesheet because two files now need the
+   * same number: the bar builds its height out of these parts, and any screen
+   * that wants to fill the space *above* the bar has to subtract exactly that
+   * height. Two independent guesses at it would drift the first time the bar's
+   * padding changed, and the symptom would be controls sitting a few pixels
+   * under the nav — visible only on a phone, and only sometimes.
+   *
+   * 52px is the tab's `min-height`, 6px the bar's own padding top and bottom,
+   * and 1px its top rule. See `BottomBar.module.css`, which is where those
+   * three come from.
+   */
+  --ws-bottom-bar-height: calc(
+    52px + 6px + max(6px, env(safe-area-inset-bottom)) + 1px
+  );
 }
 
 @media (prefers-color-scheme: dark) {

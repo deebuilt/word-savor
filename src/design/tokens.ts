@@ -121,6 +121,25 @@ export const control = {
   drawerHandleHeight: 28,
 } as const
 
+/**
+ * Chrome measurements a stylesheet has to subtract, published as CSS variables.
+ *
+ * `control.bottomBarHeight` above is the design intent — one number, useful in
+ * TS. What a stylesheet needs is the *actual* height, which includes the
+ * safe-area inset on a notched phone and is therefore only knowable at runtime.
+ * `--ws-bottom-bar-height` in `theme.css` is that value, built from the same
+ * three parts `BottomBar.module.css` builds the bar from.
+ *
+ * Named here so the variable is discoverable from the token file rather than
+ * only from the stylesheet that happens to define it — a screen filling the
+ * space above the nav should find it by reading tokens, which is where this app
+ * says every visual value lives.
+ */
+export const cssVar = {
+  /** Real bottom-bar height, safe-area included. Defined in `theme.css`. */
+  bottomBarHeight: 'var(--ws-bottom-bar-height)',
+} as const
+
 export const zIndex = {
   base: 1,
   sticky: 10,
