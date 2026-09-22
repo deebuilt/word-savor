@@ -4,6 +4,7 @@ import { LeftOutlined } from '@ant-design/icons'
 import type { SavedWord } from '../types/domain'
 import { matchesQuery, sortWords } from '../domain/library'
 import { countQuestions, isPracticable } from '../domain/practiceSelection'
+import { favoriteDefinition } from '../domain/senses'
 import styles from './PracticePick.module.css'
 
 /**
@@ -97,6 +98,9 @@ export function PracticePick({ words, onStart, onBack }: PracticePickProps) {
         <ul className={styles.list}>
           {shown.map((word) => {
             const isPicked = picked.has(word.id)
+            /* The starred definition — this list is chosen *from* to build a
+               session, so it has to show the meaning that session will drill. */
+            const definition = favoriteDefinition(word)
             return (
               <li key={word.id}>
                 <button
@@ -114,9 +118,7 @@ export function PracticePick({ words, onStart, onBack }: PracticePickProps) {
                   <span className={isPicked ? styles.tickOn : styles.tick} aria-hidden="true" />
                   <span className={styles.rowText}>
                     <span className={styles.word}>{word.word}</span>
-                    {word.senses[0] && (
-                      <span className={styles.definition}>{word.senses[0].definition}</span>
-                    )}
+                    {definition && <span className={styles.definition}>{definition}</span>}
                   </span>
                 </button>
               </li>

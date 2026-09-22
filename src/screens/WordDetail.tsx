@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Modal, Tag, message } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
-import type { Encounter, SavedWord, Usage } from '../types/domain'
+import type { Encounter, SavedWord, Sense, Usage } from '../types/domain'
 import {
   deleteWord,
   getWord,
@@ -13,8 +13,10 @@ import {
 import { lookupWord, toSavedWord, type LookupResult } from '../api/lookup'
 import { rarityLabel } from '../domain/rarity'
 import { wordPracticeRecord, type WordPracticeRecord } from '../domain/progress'
+import { withFavoriteSense } from '../domain/senses'
 import { Word } from '../components/word/Word'
 import { SenseList } from '../components/word/SenseList'
+import { FavoriteStar } from '../components/word/FavoriteStar'
 import { StatusMark } from '../components/word/StatusMark'
 import { WordHistory } from '../components/word/WordHistory'
 import { RelatedWordCard } from '../components/word/RelatedWordCard'
@@ -192,6 +194,49 @@ export function WordDetail({
     }
   }, [preview, saving, toast, onSaved])
 
+  /*
+   * Both stars write immediately and update the screen from the same object
+   * they wrote, rather than re-reading the word back.
+   *
+   * No confirmation and no save button: a favourite is a preference, it is
+   * reversible by tapping the same star again, and the filled star *is* the
+   * confirmation. A toast on top of that would announce something the reader
+   * can already see, every time.
+   *
+   * The optimistic update is not a shortcut here — `saveWord` is a put of this
+   * exact object, so the state and the row in the database are the same value.
+   * A failed write is the one case they could part company, and it leaves the
+   * screen showing a star that did not save, so it is reverted and named.
+   */
+  const toggleWordFavorite = useCallback(async () => {
+    if (!word) return
+    const next = { ...word, favorite: !word.favorite }
+    setWord(next)
+    try {
+      await saveWord(next)
+      onSaved?.()
+    } catch {
+      setWord(word)
+      toast.error('Could not save that. Try again.')
+    }
+  }, [word, toast, onSaved])
+
+  const toggleSenseFavorite = useCallback(
+    async (sense: Sense) => {
+      if (!word) return
+      const next = withFavoriteSense(word, sense)
+      setWord(next)
+      try {
+        await saveWord(next)
+        onSaved?.()
+      } catch {
+        setWord(word)
+        toast.error('Could not save that. Try again.')
+      }
+    },
+    [word, toast, onSaved],
+  )
+
   const confirmDelete = useCallback(() => {
     if (!word) return
 
@@ -254,9 +299,24 @@ export function WordDetail({
       <BackButton label={backLabel} onBack={onBack} />
 
       <div className={styles.head}>
-        <Word size="display" as="h1">
-          {shown.word}
-        </Word>
+        {/*
+          The word and its star share a row, with the star trailing at the edge
+          of the column. Only for a saved word: the star records that this one
+          is a keeper, and a word that has not been kept cannot be one.
+        */}
+        <div className={styles.wordRow}>
+          <Word size="display" as="h1">
+            {shown.word}
+          </Word>
+          {word && (
+            <FavoriteStar
+              active={word.favorite}
+              size="word"
+              label={`Favourite ${word.word}`}
+              onToggle={() => void toggleWordFavorite()}
+            />
+          )}
+        </div>
 
         <div className={styles.meta}>
           {word ? (
@@ -292,7 +352,14 @@ export function WordDetail({
         {/* Collapsed for a saved word — it is already yours, and the primary
             sense is what you came back for. Expanded for a preview, same as
             the lookup result: deciding whether to keep it needs to see it. */}
-        <SenseList senses={shown.senses} expanded={!word} />
+        {/* Stars only for a saved word — same reason as the word star above:
+            nothing to record the choice on until the word is kept. */}
+        <SenseList
+          senses={shown.senses}
+          expanded={!word}
+          favoriteRef={word?.favoriteSenseRef}
+          onToggleFavorite={word ? (sense) => void toggleSenseFavorite(sense) : undefined}
+        />
       </div>
 
       {encounters.length > 0 && (

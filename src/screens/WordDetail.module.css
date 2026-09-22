@@ -49,6 +49,25 @@
   margin-top: 8px;
 }
 
+/*
+ * The word and its star.
+ *
+ * `baseline` alignment, not `center`: the display word is tall, and a centred
+ * star floats in the middle of its cap height looking unattached. The negative
+ * right margin pulls the star's tap padding back to the page edge so the icon
+ * aligns with the column, matching what the sense stars do.
+ *
+ * A long word wraps to a second line and the star stays with the first, which
+ * is where the word begins and where the eye is.
+ */
+.wordRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-right: -10px;
+}
+
 .meta {
   display: flex;
   align-items: center;

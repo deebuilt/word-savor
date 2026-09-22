@@ -146,3 +146,86 @@ is the part where I'd build it, then hand it to you to eyeball and adjust.
 - **One favorite definition per word.**
 - Save every definition; **hiding** (reversible) is the way to declutter, added
   alongside or after this — never trimming at save time.
+
+---
+
+## Progress — 2026-09-22 (built, awaiting Ruthnie's eyes)
+
+Both stars are built and typecheck clean. **Not yet verified in the running app,
+not built, not committed.**
+
+### One decision changed from the plan above
+
+The plan said to add "one optional *favorited* flag" to each definition. Built
+differently, and the reason matters:
+
+A definition has **no ID**, so "which one did you star" has to be recorded some
+other way. A flag on the definition cannot express *only one per word* — nothing
+in the shape stops two being flagged, so the rule would have to be remembered by
+hand in every code path that writes, and the first one that forgets it produces a
+word with two stars and no way to say which practice should use.
+
+Instead the *word* stores a pointer to the starred sense —
+`favoriteSenseRef?: { partOfSpeech, definition }`. One field holds one value, so
+"only one favorite" becomes structurally impossible to violate rather than a rule
+to enforce.
+
+**Why the pair and not a position ("the 3rd definition"):** positions move. The
+app deliberately caches raw dictionary responses so senses can be re-parsed later
+without re-downloading; a re-parse that splits or merges a sense silently
+re-points every index after it, and the star would then sit on a *different
+meaning* than the one that was tapped — wrong, and quiet about it. The
+part-of-speech + text pair is what already identifies a sense here (`SenseList`
+keys its list on exactly that).
+
+**Known future cost, flagged deliberately:** if "edit a definition's wording"
+(listed in this doc as a later feature) is ever built, editing the text breaks
+the pointer. That is the day real sense IDs become correct, and it would be a
+migration. Judged better than building ID plumbing now for a feature that may
+never come — and the failure is safe either way: a pointer that misses falls back
+to the first sense, which is exactly how the app behaved before favorites existed.
+
+### One thing built beyond the plan
+
+The **synonym-match** drill also walks senses in dictionary order. Left alone, a
+word with a favorite would be drilled on the starred meaning by definition-match
+and on the dictionary's leading meaning by synonym-match, in the same session.
+So the starred sense now goes first in that walk too — as a *preference, not a
+filter*: a starred sense the thesaurus has no terms for still yields to one that
+has them, because a drill that can be built honestly beats no drill.
+
+**Ruthnie has not judged this yet** and said so plainly — it needs to be felt in
+real drills, not read about. If it turns out weird, it is a one-line change.
+
+### Files
+
+| File | What changed |
+| --- | --- |
+| `src/types/domain.ts` | New `SenseRef`; `favoriteSenseRef?` on `SavedWord` |
+| `src/domain/senses.ts` | **New.** The single resolver — `favoriteSense`, `favoriteDefinition`, `withFavoriteSense`, `isSenseRef` |
+| `src/domain/puzzles.ts` | `buildDefinitionMatch` uses the starred definition; `pickSensePair` walks starred-sense-first |
+| `src/components/word/FavoriteStar.tsx` + `.module.css` | **New.** One star component, both sizes |
+| `src/components/word/SenseList.tsx` + `.module.css` | Optional star per sense; opens the disclosure when the star is hidden behind it |
+| `src/screens/WordDetail.tsx` + `.module.css` | Both stars wired, optimistic write with revert on failure |
+| `src/screens/Library.tsx` | Row shows the starred definition |
+| `src/screens/PracticePick.tsx` | Row shows the starred definition |
+
+### Notes
+
+- **No migration.** The field is optional; every existing word reads as unstarred
+  and behaves exactly as before.
+- **Stars only appear on saved words.** The lookup preview renders the same
+  `SenseList` for a word that is not in the library — there is nowhere to record
+  a preference about it.
+- The Library's existing "Favorites" filter now works, with no change to it.
+- **No tests were written.** This project has no test harness (no runner, no test
+  files); adding one is a bigger decision than this feature. The spec's mention of
+  unit tests was written before that was known.
+
+### Left to do
+
+1. Ruthnie looks at it in the running app — especially the star placement at
+   375px and whether the synonym-drill behavior feels right.
+2. Dev server closed → full build → commit → push.
+3. **Hiding definitions** — named in this doc as the natural companion. Not built.
+4. **Flashcards** — the reason this groundwork exists. Not started.

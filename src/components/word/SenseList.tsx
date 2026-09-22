@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { RightOutlined } from '@ant-design/icons'
-import type { Sense } from '../../types/domain'
+import type { Sense, SenseRef } from '../../types/domain'
+import { isSenseRef } from '../../domain/senses'
+import { FavoriteStar } from './FavoriteStar'
 import styles from './SenseList.module.css'
 
 /**
@@ -31,10 +33,45 @@ interface SenseListProps {
    * right word and wants to see what they are about to keep.
    */
   expanded?: boolean
+  /**
+   * The starred sense, and what to do when a star is tapped.
+   *
+   * Both optional and supplied together: a star is only meaningful for a word
+   * that is *in* the library, and the lookup preview renders this same list for
+   * a word that is not yet saved. Offering a star there would be offering to
+   * record a preference about something with nowhere to record it.
+   */
+  favoriteRef?: SenseRef
+  onToggleFavorite?: (sense: Sense) => void
 }
 
-export function SenseList({ senses, expanded = false }: SenseListProps) {
-  const [showAll, setShowAll] = useState(expanded)
+export function SenseList({
+  senses,
+  expanded = false,
+  favoriteRef,
+  onToggleFavorite,
+}: SenseListProps) {
+  /*
+   * A word whose starred sense is behind the disclosure opens with it showing.
+   *
+   * The collapsed list shows the dictionary's first sense, and the whole point
+   * of starring a later one is that *it* is the sense this word means. Opening
+   * to the primary sense with the reader's own choice folded away underneath
+   * contradicts the star on the very screen the star lives on.
+   *
+   * An opening state, not a rule that keeps applying — hence the lazy
+   * initialiser rather than an effect. Once the list is open the reader owns it,
+   * and re-asserting this on every render would fight anyone who collapsed it
+   * back. Nothing is lost by leaving it: a star can only be tapped on a sense
+   * that is already visible, so there is no later moment when a favourite goes
+   * hidden and needs revealing again.
+   */
+  const [showAll, setShowAll] = useState(
+    () =>
+      expanded ||
+      (favoriteRef !== undefined &&
+        senses.slice(1).some((sense) => isSenseRef(sense, favoriteRef))),
+  )
 
   /*
    * Group the hidden senses by part of speech to describe them.
@@ -66,7 +103,23 @@ export function SenseList({ senses, expanded = false }: SenseListProps) {
               <span className={styles.partOfSpeech}>{sense.partOfSpeech}</span>
             )}
 
-            <p className={styles.definition}>{sense.definition}</p>
+            {/*
+              The star sits to the *right* of the definition, outside the text
+              column rather than in front of it. Leading it would indent every
+              definition by a tap target's width to make room for a control most
+              senses will never carry, and turn a page of prose into a page of
+              list items — this screen is a reading surface first.
+            */}
+            <div className={styles.definitionRow}>
+              <p className={styles.definition}>{sense.definition}</p>
+              {onToggleFavorite && (
+                <FavoriteStar
+                  active={favoriteRef !== undefined && isSenseRef(sense, favoriteRef)}
+                  label={`Favourite this ${sense.partOfSpeech} definition`}
+                  onToggle={() => onToggleFavorite(sense)}
+                />
+              )}
+            </div>
 
             {sense.examples.length > 0 && (
               <ul className={styles.examples}>

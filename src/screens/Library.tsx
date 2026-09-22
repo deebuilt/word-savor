@@ -15,6 +15,7 @@ import {
   type SortOption,
 } from '../domain/library'
 import { rarityLabel } from '../domain/rarity'
+import { favoriteDefinition } from '../domain/senses'
 import { Word } from '../components/word/Word'
 import { StatusMark } from '../components/word/StatusMark'
 import { WordMeta } from '../components/word/WordMeta'
@@ -303,7 +304,10 @@ function Row({
   caption: SortOption['caption']
   onOpen?: (id: string) => void
 }) {
-  const definition = word.senses[0]?.definition
+  /* The starred definition, so the row says what practice will ask about. A row
+     showing the dictionary's first sense while the drill uses the starred one is
+     the mismatch the star was added to remove, moved one screen over. */
+  const definition = favoriteDefinition(word)
   const rarity = rarityLabel(word.rarity)
 
   return (

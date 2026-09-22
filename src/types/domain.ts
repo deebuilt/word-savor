@@ -55,6 +55,39 @@ export interface Sense {
 }
 
 /**
+ * Which sense the reader starred, as the pair that identifies it.
+ *
+ * **Not an index, and not a flag on the sense itself.** Both of those were the
+ * obvious shapes and both are wrong here:
+ *
+ * - An *index* is a position, and positions are not stable. Dictionary
+ *   responses are cached raw precisely so a later parser change can re-derive
+ *   the senses without re-fetching (see `CachedLookup`), and a re-parse that
+ *   splits or merges one sense silently re-points every index after it. The
+ *   star would then sit on a different meaning than the one that was tapped,
+ *   which is worse than not having starred at all — it is wrong and quiet.
+ * - A *flag on `Sense`* cannot express "only one per word". Nothing in the type
+ *   stops two senses carrying it, so the rule would live in every write path
+ *   rather than in the shape, and the first path that forgets it produces a
+ *   word with two favourites and no way to say which one practice should use.
+ *   One field can only hold one value, so the pointer makes the invariant
+ *   structural.
+ *
+ * The pair is what identifies a sense in this app already — `SenseList` keys
+ * its list on exactly `partOfSpeech:definition`, because definitions are
+ * deduplicated upstream and the pair is therefore unique within a word.
+ *
+ * If the text ever does change out from under the pointer, the lookup simply
+ * misses and every reader falls back to the first sense — the same behaviour as
+ * a word that was never starred. A miss that degrades to the old default is the
+ * failure worth designing for; a miss that points at the wrong definition is not.
+ */
+export interface SenseRef {
+  partOfSpeech: string
+  definition: string
+}
+
+/**
  * Synonyms and antonyms for one part of speech.
  *
  * The thesaurus groups its terms by entry (part of speech) and by sense within
@@ -131,6 +164,21 @@ export interface SavedWord {
   note?: string
   tags: string[]
   favorite: boolean
+  /**
+   * The one sense the reader starred, if any.
+   *
+   * What practice drills and what the one-line summaries show. Optional, and
+   * that absence is the whole migration story: a word with nothing starred
+   * behaves exactly as every word did before this field existed — first sense,
+   * same as the dictionary's own order. So no word already in the library has
+   * to be touched.
+   *
+   * Read it through `favoriteSense` in `domain/senses.ts` rather than directly.
+   * The pointer can miss (see `SenseRef`), and every reader has to fall back the
+   * same way or the page and the drill disagree about which definition this
+   * word means.
+   */
+  favoriteSenseRef?: SenseRef
 
   /* Scheduling ----------------------------------------------------------- */
 

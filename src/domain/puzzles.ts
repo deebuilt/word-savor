@@ -1,4 +1,5 @@
-import type { DrillKind, SavedWord } from '../types/domain'
+import type { DrillKind, SavedWord, Sense } from '../types/domain'
+import { favoriteDefinition, favoriteSense } from './senses'
 
 /**
  * Practice modes that drill one saved word using data it already carries —
@@ -148,8 +149,20 @@ function isFullSentence(text: string): boolean {
   return /^[A-Z]/.test(text) && /[.?!]$/.test(text) && text.split(/\s+/).length >= 4
 }
 
+/**
+ * The starred definition, not the dictionary's first one.
+ *
+ * This is the drill the favourite star exists for. A dictionary leads with the
+ * meaning it judges most prominent, which is often not the meaning the reader
+ * met the word in: *precipitate* leads with "to throw or hurl", while the sense
+ * worth drilling is "to bring about suddenly". Drilling the wrong one is not a
+ * harder question, it is practice spent on a meaning the reader does not use.
+ *
+ * Unstarred words are unaffected — `favoriteDefinition` falls back to the first
+ * sense, which is what this read before.
+ */
 export function buildDefinitionMatch(word: SavedWord): DefinitionMatchDrill | undefined {
-  const definition = word.senses[0]?.definition
+  const definition = favoriteDefinition(word)
   if (!definition) return undefined
   return { kind: 'definition-match', word, definition }
 }
@@ -202,12 +215,20 @@ interface SensePair {
  * another sense's synonym. A word whose grouped terms cover none of its senses
  * gets no drill at all: an honest omission, where a mismatched pairing would be
  * a small lie told confidently.
+ *
+ * **The starred sense goes first in that walk.** Otherwise a word with a
+ * favourite is drilled on the starred meaning by definition-match and on the
+ * dictionary's leading meaning by this one, in the same session — and the
+ * reader, having said which meaning they care about, is still answering
+ * questions about the other. It stays a preference rather than a filter: a
+ * starred sense the thesaurus has no terms for yields to one that has them,
+ * because a drill that can be built honestly beats no drill.
  */
 function pickSensePair(word: SavedWord): SensePair | undefined {
   const groups = word.synonymsByPartOfSpeech
   if (!groups || groups.length === 0) return undefined
 
-  for (const sense of word.senses) {
+  for (const sense of sensesFavoriteFirst(word)) {
     if (!sense.definition) continue
     const group = groups.find(
       (candidate) => candidate.partOfSpeech.toLowerCase() === sense.partOfSpeech.toLowerCase(),
@@ -230,6 +251,21 @@ function pickSensePair(word: SavedWord): SensePair | undefined {
   }
 
   return undefined
+}
+
+/**
+ * The word's senses with the starred one moved to the front.
+ *
+ * A reordering rather than a filter, so every caller keeps its existing
+ * fallback behaviour intact — the list is the same length and holds the same
+ * senses, and a walk that used to stop at the dictionary's first now stops at
+ * the reader's choice, then continues exactly as before. Unstarred words, and
+ * stars that no longer match a sense, come back in the original order.
+ */
+function sensesFavoriteFirst(word: SavedWord): Sense[] {
+  const starred = word.favoriteSenseRef ? favoriteSense(word) : undefined
+  if (!starred) return word.senses
+  return [starred, ...word.senses.filter((sense) => sense !== starred)]
 }
 
 /*

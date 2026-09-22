@@ -34,8 +34,30 @@
   color: var(--ws-ink-faint);
 }
 
+/*
+ * The definition and its star.
+ *
+ * `start` rather than `center`: a definition runs to several lines on a phone,
+ * and a centred star drifts into the middle of the paragraph as it grows. Level
+ * with the first line is where the reader is looking when they decide to star it.
+ *
+ * The negative right margin pulls the star's own padding back out to the edge of
+ * the column, so the *icon* lines up with the page rather than the 44px target
+ * around it. Without it every definition appears inset by a tap target nobody
+ * can see.
+ */
+.definitionRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin-right: -10px;
+}
+
 .definition {
   margin: 0;
+  /* Takes the row, so the star is pushed to the far edge rather than sitting
+     against the last word of a short definition. */
+  flex: 1;
   font-size: calc(17px * var(--ws-scale-body));
   line-height: calc(1.5 * var(--ws-leading-body));
   color: var(--ws-ink);

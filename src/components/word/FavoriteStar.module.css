@@ -1,0 +1,79 @@
+/*
+ * The favourite star.
+ *
+ * A bare button with no border or background — the icon is the whole control.
+ * Anything else (a bordered toggle, a filled chip) would compete with the
+ * definition it sits beside, and this page is a reading surface first.
+ */
+
+.star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ws-ink-faint);
+  cursor: pointer;
+  /* Removes the grey flash iOS paints over the whole button on tap, which on a
+     bare icon reads as a rendering fault rather than as feedback. */
+  -webkit-tap-highlight-color: transparent;
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+/*
+ * 44px, the minimum comfortable tap target, on both sizes — the *icon* differs
+ * between them, the target does not. A 16px star with a 16px target is a miss
+ * every other tap on a phone, and this control sits inches from a delete button.
+ */
+.sense {
+  width: 44px;
+  height: 44px;
+  font-size: calc(17px * var(--ws-scale-body));
+  /*
+   * The target is 44px tall and a definition's first line is about 25px, so the
+   * icon would otherwise float half a line below the text it belongs to. This
+   * lifts the icon level with that first line while the tap target keeps its
+   * full height, overlapping the whitespace above and below rather than shrinking.
+   */
+  margin-top: -10px;
+}
+
+.word {
+  width: 44px;
+  height: 44px;
+  font-size: calc(22px * var(--ws-scale-body));
+}
+
+.star:hover {
+  color: var(--ws-ink-soft);
+}
+
+/* Filled. The accent rather than a conventional gold: this app has one accent
+   and a second signal colour would be the only place in it that breaks that. */
+.on,
+.on:hover {
+  color: var(--ws-accent);
+}
+
+/* A brief squash on tap, so the state change is felt as well as seen. */
+.star:active {
+  transform: scale(0.88);
+}
+
+.star:focus-visible {
+  outline: 2px solid var(--ws-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star {
+    transition: none;
+  }
+
+  .star:active {
+    transform: none;
+  }
+}
