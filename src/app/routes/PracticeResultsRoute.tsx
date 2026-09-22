@@ -1,5 +1,6 @@
-import { Navigate, useNavigate, useParams } from 'react-router'
+import { Navigate, useParams } from 'react-router'
 import { PracticeResults } from '../../screens/PracticeResults'
+import { useBackToPractice } from './useBackToPractice'
 
 /**
  * `/practice/results/:sessionId` — a past session in detail.
@@ -11,14 +12,9 @@ import { PracticeResults } from '../../screens/PracticeResults'
  */
 export function PracticeResultsRoute() {
   const { sessionId } = useParams()
-  const navigate = useNavigate()
+  const back = useBackToPractice()
 
   if (!sessionId) return <Navigate to="/practice" replace />
 
-  return (
-    <PracticeResults
-      sessionId={sessionId}
-      onBack={() => void navigate('/practice')}
-    />
-  )
+  return <PracticeResults sessionId={sessionId} onBack={back} />
 }

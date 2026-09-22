@@ -146,8 +146,12 @@ export function Library({ refreshToken = 0, onOpenWord }: LibraryProps) {
 
   return (
     <div className={styles.screen}>
+      {/*
+        No heading here — the header names the screen. What is left is the
+        count, which was never a title's companion so much as a caption on the
+        list, and now sits directly above the list it counts.
+      */}
       <div className={styles.head}>
-        <h1 className={styles.title}>Library</h1>
         {total > 0 && (
           <span className={styles.count}>
             {/* The count follows what is on screen once anything narrows it,

@@ -21,7 +21,8 @@ export function More() {
 
   return (
     <div className={styles.screen}>
-      <h1 className={styles.title}>More</h1>
+      {/* No heading — the app bar says More. What follows is the standfirst
+          that used to sit under it. */}
       <p className={styles.body}>
         Appearance now; backup and about once there is something to back up.
       </p>

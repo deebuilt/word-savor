@@ -18,22 +18,23 @@
   margin: 0 auto;
 }
 
+/*
+ * What is left of the screen's head now that the title moved into the app bar:
+ * the count, and nothing else.
+ *
+ * Pushed to the right rather than left-aligned under a title that is no longer
+ * there. A lone caption on the left margin reads as a heading that forgot to be
+ * one; on the right it reads as what it is, a tally of the list below.
+ */
 .head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
-  margin-bottom: 16px;
-}
-
-.title {
-  margin: 0;
-  font-family: var(--ws-font-word);
-  font-size: calc(38px * var(--ws-scale-word));
-  font-weight: var(--ws-weight-word-bold);
-  line-height: calc(1.1 * var(--ws-leading-word));
-  letter-spacing: -0.02em;
-  color: var(--ws-ink);
+  margin-bottom: 10px;
+  /* Reserves the row's height at zero words, so the search field does not jump
+     up the screen the moment the library empties. */
+  min-height: 18px;
 }
 
 .count {
@@ -170,8 +171,10 @@
  * The letter heading.
  *
  * Sticky, so the letter you are inside stays named while you scroll past twenty
- * words under it. `top` clears the app header, which is also sticky — without
- * the offset the two overlap and the letter disappears behind the wordmark.
+ * words under it. `top: 0` is the top of the scrolling region, not of the
+ * viewport — the app header is a sibling of that region rather than floating
+ * over it, so there is no bar for this to clear and no offset to keep in sync
+ * with one.
  */
 .groupLetter {
   position: sticky;

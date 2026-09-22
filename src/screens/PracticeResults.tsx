@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { LeftOutlined } from '@ant-design/icons'
 import type { PracticeSession, SavedWord } from '../types/domain'
 import { getSession, listWords } from '../storage/db'
 import { practiceCard } from '../domain/practiceSelection'
 import { SessionBreakdown } from '../components/practice/SessionBreakdown'
+import { useHeaderState } from '../app/useHeaderState'
 import styles from './PracticeResults.module.css'
 
 /**
@@ -47,15 +47,24 @@ export function PracticeResults({ sessionId, onBack }: PracticeResultsProps) {
     }
   }, [sessionId])
 
+  /*
+   * The title is the session's date, which is not in the address.
+   *
+   * This is the case the header's registry exists for: `/practice/results/:id`
+   * can be resolved to the word "Session" and no further, and "Session" is not
+   * what a reader scrolling back through their history needs to see. So the
+   * screen supplies the real one once the record has been read, and until then
+   * the path's answer stands — which is why there is no flash of an empty bar
+   * while the session loads.
+   */
+  useHeaderState({
+    title: load.status === 'found' ? formatWhen(load.session.endedAt) : undefined,
+    backLabel: 'Back to Practice',
+    onBack,
+  })
+
   return (
     <div className={styles.screen}>
-      <div className={styles.head}>
-        <button type="button" className={styles.back} onClick={onBack}>
-          <LeftOutlined />
-          Practice
-        </button>
-      </div>
-
       {load.status === 'loading' && <p className={styles.state}>Reading the session…</p>}
 
       {load.status === 'missing' && (
@@ -66,7 +75,6 @@ export function PracticeResults({ sessionId, onBack }: PracticeResultsProps) {
 
       {load.status === 'found' && (
         <>
-          <h1 className={styles.title}>{formatWhen(load.session.endedAt)}</h1>
           <p className={styles.subtitle}>{describe(load.session)}</p>
 
           <p className={styles.score}>

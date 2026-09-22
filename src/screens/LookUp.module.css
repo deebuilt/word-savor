@@ -40,10 +40,42 @@
  */
 .head {
   display: flex;
-  align-items: flex-start;
+  /*
+   * Baseline rather than flex-start, so the save glyph sits on the word's own
+   * baseline instead of level with the top of its ascenders. Against display
+   * type that difference is several pixels and reads as a misalignment.
+   */
+  align-items: baseline;
   justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 12px;
+  /*
+   * No wrapping now that the action is a circle. The old labelled button
+   * needed an escape hatch at 375px; a 40px glyph beside a word that already
+   * wraps within its own column has nowhere it needs to go.
+   */
+}
+
+/*
+ * The compact save, beside the word.
+ *
+ * `flex: none` so it keeps its circle when a long word takes the rest of the
+ * row — without it the button is a flex item that will happily become an oval.
+ */
+.saveMark {
+  flex: none;
+  /* Nudged onto the word's baseline: a circular button aligns by its box, and
+     its glyph sits above the baseline the box is aligned to. */
+  transform: translateY(2px);
+}
+
+/*
+ * The full save, at the foot of the encounter.
+ *
+ * Full width and past the fields rather than beside them: this is the end of
+ * the screen's one flow, and the last thing the thumb reaches on its way down.
+ */
+.saveFull {
+  margin-top: 24px;
 }
 
 .headText {

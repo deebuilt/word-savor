@@ -114,7 +114,6 @@ export function Progress({ refreshToken = 0 }: ProgressProps) {
   if (!reading) {
     return (
       <div className={styles.screen}>
-        <h1 className={styles.title}>Progress</h1>
         <p className={styles.state}>Reading your history…</p>
       </div>
     )
@@ -124,8 +123,6 @@ export function Progress({ refreshToken = 0 }: ProgressProps) {
 
   return (
     <div className={styles.screen}>
-      <h1 className={styles.title}>Progress</h1>
-
       {totals.saved === 0 ? (
         <p className={styles.state}>
           Nothing to show yet. Save a word in Look Up, and this screen starts

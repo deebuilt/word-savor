@@ -1,6 +1,7 @@
 import { RightOutlined } from '@ant-design/icons'
 import type { PracticeSession, SavedWord } from '../types/domain'
 import { SessionBreakdown } from '../components/practice/SessionBreakdown'
+import { useHeaderState } from '../app/useHeaderState'
 import styles from './PracticeDone.module.css'
 
 /**
@@ -35,12 +36,21 @@ interface PracticeDoneProps {
 }
 
 export function PracticeDone({ session, words, skipped, onDone }: PracticeDoneProps) {
+  /*
+   * "Session complete" or "Session so far" — a distinction the address cannot
+   * make, since both are `/practice/done`. Finishing the queue and walking away
+   * from it halfway land on the same screen and should not claim the same
+   * thing, so the title is registered rather than resolved from the path.
+   *
+   * No back button: the way on from here is the button at the foot of the
+   * screen, which returns to the menu and is labelled with what it does. A
+   * chevron in the bar pointing at the session just left would offer to
+   * re-enter a run that is already recorded.
+   */
+  useHeaderState({ title: session.completed ? 'Session complete' : 'Session so far' })
+
   return (
     <div className={styles.screen}>
-      <h1 className={styles.title}>
-        {session.completed ? 'Session complete' : 'Session so far'}
-      </h1>
-
       <p className={styles.score}>
         <span className={styles.scoreFigure}>
           {session.correct} of {session.total}

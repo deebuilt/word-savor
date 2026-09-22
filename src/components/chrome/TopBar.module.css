@@ -1,20 +1,27 @@
 /*
- * The header: wordmark left, controls right.
+ * The header: a leading slot, the screen's title, and the theme control.
  *
  * Neither sticky nor fixed — it is a sibling of the scrolling region rather
  * than inside it, so it stays put on its own. The shell is a column of three:
  * this bar, one scroll area, and the nav. Nothing here needs to be lifted out
  * of flow, which also means no `z-index` and no height for other components to
  * compensate for.
+ *
+ * **Why a grid and not flex with `space-between`.** The title is centred in the
+ * bar, not centred in the space left over. Under `space-between` a one-glyph
+ * leading slot and a 44px trailing button are near enough the same width that
+ * it *looks* centred, and then a long title grows into whichever side has slack
+ * and the centre drifts as you navigate. Three explicit columns with equal
+ * outer tracks pin the middle to the bar's actual centre, permanently.
  */
 .bar {
   flex: none;
-  display: flex;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   min-height: 56px;
-  padding: 8px 16px;
+  padding: 8px 12px;
   /* Clear of a notch when the app is installed and running full-bleed. */
   padding-top: max(8px, env(safe-area-inset-top));
   border-bottom: 1px solid var(--ws-line);
@@ -26,40 +33,75 @@
   background: var(--ws-paper);
 }
 
+/* The leading slot holds either the back button or the mark, never both. */
+.lead {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
 /*
- * The wordmark.
+ * The mark, reduced to its initials.
  *
- * Set in the word face, because it is the app saying its own name in the voice
- * it sets every word in. It is the one place the two words are locked up as a
- * single unit, so the weight shift carries the join instead of a space.
+ * Set in the word face and carrying the same weight shift as the full wordmark
+ * — bold W, lighter S — so the pair reads as one lockup rather than as two
+ * letters that happen to be adjacent. These are the glyphs in the app icon,
+ * which is what makes two letters in a corner legible as the app at all.
  */
-.wordmark {
+.mark {
   display: flex;
   align-items: baseline;
   gap: 0;
   margin: 0;
+  padding-left: 2px;
   font-family: var(--ws-font-word);
-  font-size: calc(21px * var(--ws-scale-word));
+  font-size: calc(20px * var(--ws-scale-word));
   line-height: 1.1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   color: var(--ws-ink);
   user-select: none;
 }
 
-.markWord {
+.markW {
   font-weight: var(--ws-weight-word-bold);
 }
 
-/* "Savor" in the lighter weight — the join reads without a space or a dot. */
-.markSavor {
+.markS {
   font-weight: var(--ws-weight-word-medium);
   color: var(--ws-ink-soft);
+}
+
+/*
+ * The screen's name.
+ *
+ * Set in the body face, not the word face. The word face is how the app sets
+ * *words* — the thing you looked up, the thing on a card — and spending it on
+ * chrome would blur a distinction the whole design rests on. This is a label,
+ * so it is lettered like one: small, medium weight, a little tracking.
+ *
+ * It truncates rather than wraps. A two-line title would change the bar's
+ * height, which would move the scroll region under it, on a screen whose title
+ * can be a word of any length.
+ */
+.title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  font-family: var(--ws-font-body);
+  font-size: calc(16px * var(--ws-scale-body));
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.005em;
+  color: var(--ws-ink);
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: flex-end;
 }
 
 /*

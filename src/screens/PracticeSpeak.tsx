@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
-import { LeftOutlined } from '@ant-design/icons'
 import type { SavedWord } from '../types/domain'
 import { sortWords } from '../domain/library'
 import { AudioButton } from '../components/word/AudioButton'
+import { useHeaderState } from '../app/useHeaderState'
 import styles from './PracticeSpeak.module.css'
 
 /**
@@ -32,6 +32,17 @@ interface PracticeSpeakProps {
 }
 
 export function PracticeSpeak({ words, onBack }: PracticeSpeakProps) {
+  /*
+   * The way out lives in the app bar now, beside the title.
+   *
+   * It used to be a labelled link above the heading, which meant every screen
+   * under Practice opened with two rows of chrome — a back link, then a 38px
+   * title — before anything you came for. Both facts are now in the bar, where
+   * they cost no vertical space at all and where the phone's own back gesture
+   * already points.
+   */
+  useHeaderState({ backLabel: 'Back to Practice', onBack })
+
   const spoken = useMemo(
     () => sortWords(words.filter((word) => Boolean(word.audioUrl)), 'alphabetical'),
     [words],
@@ -41,14 +52,6 @@ export function PracticeSpeak({ words, onBack }: PracticeSpeakProps) {
 
   return (
     <div className={styles.screen}>
-      <div className={styles.head}>
-        <button type="button" className={styles.back} onClick={onBack}>
-          <LeftOutlined />
-          Practice
-        </button>
-      </div>
-
-      <h1 className={styles.title}>Audio practice</h1>
       <p className={styles.blurb}>Listen and repeat. Nothing is scored.</p>
 
       {spoken.length === 0 ? (

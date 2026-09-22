@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Input, Tag, message } from 'antd'
-import { SearchOutlined } from '@ant-design/icons'
+import type { InputRef } from 'antd'
+import { CheckOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import {
   lookupWord,
   toSavedWord,
@@ -23,10 +24,13 @@ import styles from './LookUp.module.css'
  * misspelling of a word just overheard — and correcting one should not mean
  * navigating back.
  *
- * **Save sits at the top, beside the word.** Not below the definitions: a word
- * like "bank" carries twelve senses, and putting the only action on the screen
- * underneath all of them turns keeping a word into a scroll. The decision is
- * made on sight.
+ * **Save is offered twice, and that is deliberate.** A glyph beside the word,
+ * because a word like "bank" carries twelve senses and a reader who knows on
+ * sight that they want it should not have to scroll past all of them to say
+ * so. And a full button at the foot of the encounter, because the reader who
+ * *did* read to the bottom and write down the sentence they met it in ends up
+ * there, a whole screen away from the only other way to keep it. Both do the
+ * same thing; which one is tapped says only when the mind was made up.
  *
  * **The encounter fields are optional and never block.** Where a word was met
  * is the strongest memory hook the app has, so the fields are visible rather
@@ -47,6 +51,15 @@ interface LookUpProps {
   initialWord?: string
   /** The sentence the shared word arrived in, prefilled into the encounter. */
   initialContext?: string
+  /**
+   * A number that increases every time the reader asks for the search field.
+   *
+   * Tapping Look Up while Look Up is already open means "I want to type" — the
+   * gesture Spotify gives search — and the address is already correct, so
+   * nothing about the location changes to signal it. The shell increments this
+   * instead. The value itself is meaningless; only the change matters.
+   */
+  focusRequest?: number
 }
 
 type Status =
@@ -56,7 +69,7 @@ type Status =
   | { kind: 'missing'; word: string; suggestions?: string[] }
   | { kind: 'offline' }
 
-export function LookUp({ onSaved, initialWord, initialContext }: LookUpProps) {
+export function LookUp({ onSaved, initialWord, initialContext, focusRequest }: LookUpProps) {
   const [query, setQuery] = useState(initialWord ?? '')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [context, setContext] = useState(initialContext ?? '')
@@ -72,6 +85,37 @@ export function LookUp({ onSaved, initialWord, initialContext }: LookUpProps) {
    * search takes a ticket and only the newest one is allowed to write state.
    */
   const requestId = useRef(0)
+
+  /*
+   * The search field, so the screen can put the cursor in it.
+   *
+   * Two moments want that. Arriving at Look Up at all is one: this screen has a
+   * single purpose and one input, and landing on it without a keyboard means
+   * the reader's first act is always the same tap. The other is asking again —
+   * tapping Look Up from Look Up — which previously did nothing, because the
+   * address was already right.
+   *
+   * Both are the same call, so both run through one effect keyed on the
+   * request. `focusRequest` starts undefined on a first arrival and becomes a
+   * number on every later ask, and a change in either direction is a change.
+   */
+  const searchField = useRef<InputRef>(null)
+
+  useEffect(() => {
+    /*
+     * Not when a word arrived from the share sheet. That word is already
+     * searched and the reader's next move is Save or the encounter fields —
+     * opening a keyboard over the result would bury the thing they shared.
+     */
+    if (initialWord) return
+
+    /*
+     * `select` rather than plain focus, so a word already in the box is ready
+     * to be replaced by typing. Someone asking for the field again is starting
+     * a new lookup, not editing the last one.
+     */
+    searchField.current?.focus({ cursor: 'all' })
+  }, [focusRequest, initialWord])
 
   const search = useCallback(
     async (raw: string, options: { keepContext?: boolean } = {}) => {
@@ -212,6 +256,7 @@ export function LookUp({ onSaved, initialWord, initialContext }: LookUpProps) {
 
       <div className={styles.search}>
         <Input.Search
+          ref={searchField}
           className={styles.searchInput}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -224,9 +269,9 @@ export function LookUp({ onSaved, initialWord, initialContext }: LookUpProps) {
           placeholder="Type a word"
           /*
            * A magnifying glass rather than the words "Look up". The screen is
-           * already titled Look Up in the nav, the field is the only thing on
-           * it, and the label was restating what the placeholder and the tab
-           * both say. The icon also keeps the button square, which leaves the
+           * already titled Look Up in the header and in the nav, the field is
+           * the only thing on it, and the label was restating what the
+           * placeholder and the tab both say. The icon also keeps the button square, which leaves the
            * field its full width at 375px.
            */
           enterButton={
@@ -358,15 +403,32 @@ function Result({
           )}
         </div>
 
+        {/*
+          Save, as a glyph beside the word rather than a labelled button
+          floating off its shoulder.
+
+          The decision to keep a word is made on sight, so this has to be
+          reachable without scrolling — but the wide button that used to sit
+          here was as tall as the word itself and fought it for the top of the
+          screen. A round icon button reads as an accent on the word, sits on
+          its baseline, and gives the word back the line.
+
+          The label it loses is not lost: the button at the foot of the screen
+          spells it out, and this one carries the same sentence as its
+          accessible name.
+        */}
         <Button
-          type="primary"
+          type={alreadySaved ? 'default' : 'primary'}
+          shape="circle"
           size="large"
+          className={styles.saveMark}
+          icon={alreadySaved ? <CheckOutlined /> : <PlusOutlined />}
           loading={saving}
           disabled={alreadySaved}
           onClick={onSave}
-        >
-          {alreadySaved ? 'In your library' : 'Save'}
-        </Button>
+          aria-label={alreadySaved ? `${result.word} is in your library` : `Save ${result.word}`}
+          title={alreadySaved ? 'In your library' : 'Save'}
+        />
       </div>
 
       <div className={styles.senses}>
@@ -431,6 +493,32 @@ function Result({
               Both optional. Save without them and add them whenever.
             </p>
           </div>
+
+          {/*
+            Save again, at the foot of the screen.
+
+            Not a duplicate by accident. Reading a word runs top to bottom —
+            the senses, then the sentence you met it in, then who said it — and
+            the reader finishes that at the *bottom*, with the one button on
+            the screen now a full scroll behind them. Worse, the encounter
+            fields are the last thing they touched, so the save they want is
+            the one that includes what they just typed, and the only way to
+            reach it was to scroll back past everything they had already read.
+
+            Both buttons do exactly the same thing. Which one gets tapped just
+            says whether the word was kept on sight or after its story was
+            written down, and the app has no opinion about that.
+          */}
+          <Button
+            type="primary"
+            size="large"
+            block
+            className={styles.saveFull}
+            loading={saving}
+            onClick={onSave}
+          >
+            Save to library
+          </Button>
         </section>
       )}
     </div>

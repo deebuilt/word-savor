@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
 import { Input } from 'antd'
-import { LeftOutlined } from '@ant-design/icons'
 import type { SavedWord } from '../types/domain'
 import { matchesQuery, sortWords } from '../domain/library'
 import { countQuestions, isPracticable } from '../domain/practiceSelection'
 import { favoriteDefinition } from '../domain/senses'
+import { useHeaderState } from '../app/useHeaderState'
 import styles from './PracticePick.module.css'
 
 /**
@@ -34,6 +34,17 @@ interface PracticePickProps {
 }
 
 export function PracticePick({ words, onStart, onBack }: PracticePickProps) {
+  /*
+   * The way out lives in the app bar now, beside the title.
+   *
+   * It used to be a labelled link above the heading, which meant every screen
+   * under Practice opened with two rows of chrome — a back link, then a 38px
+   * title — before anything you came for. Both facts are now in the bar, where
+   * they cost no vertical space at all and where the phone's own back gesture
+   * already points.
+   */
+  useHeaderState({ backLabel: 'Back to Practice', onBack })
+
   const [query, setQuery] = useState('')
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
 
@@ -75,15 +86,6 @@ export function PracticePick({ words, onStart, onBack }: PracticePickProps) {
 
   return (
     <div className={styles.screen}>
-      <div className={styles.head}>
-        <button type="button" className={styles.back} onClick={onBack}>
-          <LeftOutlined />
-          Practice
-        </button>
-      </div>
-
-      <h1 className={styles.title}>Choose your own</h1>
-
       <Input
         className={styles.search}
         placeholder="Find a word"

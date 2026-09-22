@@ -16,7 +16,8 @@ export function LookUpRoute() {
   const { state } = useLocation()
   const { onSaved } = useRefresh()
 
-  const shared = (state as { shared?: SharedCapture } | null)?.shared
+  const entry = state as { shared?: SharedCapture; focusSearch?: number } | null
+  const shared = entry?.shared
 
   return (
     <LookUp
@@ -28,6 +29,9 @@ export function LookUpRoute() {
       onSaved={onSaved}
       initialWord={shared?.word}
       initialContext={shared?.context}
+      /* Bumped by the shell when Look Up is tapped from Look Up. Undefined on
+         an ordinary arrival, which the screen reads as its first focus. */
+      focusRequest={entry?.focusSearch}
     />
   )
 }

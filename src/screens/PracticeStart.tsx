@@ -123,7 +123,6 @@ export function PracticeStart({
   if (words.length === 0) {
     return (
       <div className={styles.screen}>
-        <h1 className={styles.title}>Practice</h1>
         <p className={styles.state}>
           Nothing to practice yet. Save a few words in Look Up and they will show up here.
         </p>
@@ -133,8 +132,6 @@ export function PracticeStart({
 
   return (
     <div className={styles.screen}>
-      <h1 className={styles.title}>Practice</h1>
-
       {offer.status === 'found' && (
         <button type="button" className={styles.resume} onClick={onResume}>
           <span className={styles.resumeLabel}>Pick up where you left off</span>

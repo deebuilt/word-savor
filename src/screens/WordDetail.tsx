@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Button, Modal, Tag, message } from 'antd'
-import { ArrowLeftOutlined } from '@ant-design/icons'
 import type { Encounter, SavedWord, Sense, Usage } from '../types/domain'
 import {
   deleteWord,
@@ -21,6 +20,7 @@ import { StatusMark } from '../components/word/StatusMark'
 import { WordHistory } from '../components/word/WordHistory'
 import { RelatedWordCard } from '../components/word/RelatedWordCard'
 import { AudioButton } from '../components/word/AudioButton'
+import { useHeaderState } from '../app/useHeaderState'
 import styles from './WordDetail.module.css'
 
 /**
@@ -265,10 +265,29 @@ export function WordDetail({
     })
   }, [word, encounters.length, toast, onDeleted])
 
+  /*
+   * The way back moves into the app bar; the word does not.
+   *
+   * This screen is the one exception to "the header holds the title". The word
+   * here is set in display type and it is the *subject*, not a label on the
+   * screen — shrinking it into a 16px bar and leaving the page to open on a
+   * pronunciation would be reading it out of the app entirely. So the header
+   * keeps naming the screen "Library", which is where you are and where Back
+   * goes, and the word stays where it can be looked at.
+   *
+   * What the bar does take is the back button, and with it the trail: the
+   * label says "sagacious" rather than "Library" when Back really returns to
+   * another word opened from a related-word popup. Drawn as a chevron, spoken
+   * in full — see `HeaderState`.
+   */
+  useHeaderState({
+    backLabel: backLabel ? `Back to ${backLabel}` : 'Back to Library',
+    onBack,
+  })
+
   if (loading) {
     return (
       <div className={styles.screen}>
-        <BackButton label={backLabel} onBack={onBack} />
         <p className={styles.state}>Opening…</p>
       </div>
     )
@@ -277,7 +296,6 @@ export function WordDetail({
   if (!word && !preview) {
     return (
       <div className={styles.screen}>
-        <BackButton label={backLabel} onBack={onBack} />
         <p className={styles.state}>
           {previewMissing
             ? 'No dictionary entry for this word.'
@@ -296,7 +314,6 @@ export function WordDetail({
   return (
     <div className={styles.screen}>
       {toastHolder}
-      <BackButton label={backLabel} onBack={onBack} />
 
       <div className={styles.head}>
         {/*
@@ -464,15 +481,6 @@ export function WordDetail({
 }
 
 /* -------------------------------------------------------------------------- */
-
-function BackButton({ label, onBack }: { label?: string; onBack: () => void }) {
-  return (
-    <button type="button" className={styles.back} onClick={onBack}>
-      <ArrowLeftOutlined />
-      {label ?? 'Library'}
-    </button>
-  )
-}
 
 /**
  * One recorded encounter.

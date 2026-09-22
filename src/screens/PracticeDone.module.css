@@ -12,16 +12,6 @@
   margin: 0 auto;
 }
 
-.title {
-  margin: 0 0 4px;
-  font-family: var(--ws-font-word);
-  font-size: calc(38px * var(--ws-scale-word));
-  font-weight: var(--ws-weight-word-bold);
-  line-height: calc(1.1 * var(--ws-leading-word));
-  letter-spacing: -0.02em;
-  color: var(--ws-ink);
-}
-
 .score {
   margin: 0 0 4px;
   display: flex;

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { LeftOutlined } from '@ant-design/icons'
 import type { SavedWord } from '../types/domain'
 import {
   buildDeck,
@@ -14,6 +13,7 @@ import { Flashcard } from '../components/flashcards/Flashcard'
 import { DeckControls } from '../components/flashcards/DeckControls'
 import { DeckOptions } from '../components/flashcards/DeckOptions'
 import { ScopeSwitch } from '../components/flashcards/ScopeSwitch'
+import { useHeaderState } from '../app/useHeaderState'
 import styles from './PracticeFlashcards.module.css'
 
 /**
@@ -50,6 +50,17 @@ interface PracticeFlashcardsProps {
 }
 
 export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
+  /*
+   * The way out lives in the app bar now, beside the title.
+   *
+   * It used to be a labelled link above the heading, which meant every screen
+   * under Practice opened with two rows of chrome — a back link, then a 38px
+   * title — before anything you came for. Both facts are now in the bar, where
+   * they cost no vertical space at all and where the phone's own back gesture
+   * already points.
+   */
+  useHeaderState({ backLabel: 'Back to Practice', onBack })
+
   const [scope, setScope] = useState<DeckScope>('all')
   const [direction, setDirection] = useState<DeckDirection>('word')
   const [order, setOrder] = useState<DeckOrder>('sorted')
@@ -228,15 +239,6 @@ export function PracticeFlashcards({ words, onBack }: PracticeFlashcardsProps) {
 
   return (
     <div className={styles.screen}>
-      <div className={styles.head}>
-        <button type="button" className={styles.back} onClick={onBack}>
-          <LeftOutlined />
-          Practice
-        </button>
-      </div>
-
-      <h1 className={styles.title}>Flashcards</h1>
-
       <ScopeSwitch scope={scope} counts={counts} onChange={changeScope} />
 
       {card ? (

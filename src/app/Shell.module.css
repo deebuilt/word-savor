@@ -37,29 +37,6 @@
   padding: 32px 20px 24px;
 }
 
-/*
- * Screen titles are set in the word face, not the body face.
- *
- * The word face is the app's voice and the reason the library reads as a
- * collection rather than a list of records. Using it for headings as well as
- * for the words themselves is what ties the two together — and it means a
- * reader who switches to Hyperlegible gets it here too, not just on the words.
- *
- * Every value comes from a variable rather than a literal: the family, the
- * optical scale, and the weight. Fraunces has a 600; Atkinson Hyperlegible and
- * OpenDyslexic stop at 700 with nothing between 400 and it, so a hardcoded 600
- * would be synthesised on two of the four faces.
- */
-.title {
-  margin: 0 0 8px;
-  font-family: var(--ws-font-word);
-  font-size: calc(38px * var(--ws-scale-word));
-  font-weight: var(--ws-weight-word-bold);
-  line-height: calc(1.1 * var(--ws-leading-word));
-  letter-spacing: -0.02em;
-  color: var(--ws-ink);
-}
-
 .body {
   margin: 0;
   max-width: 34ch;
