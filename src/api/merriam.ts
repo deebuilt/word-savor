@@ -86,6 +86,20 @@ interface WireMeta {
   stems?: string[]
 }
 
+/**
+ * A run-on entry: a derived form tucked under another word's entry, e.g.
+ * "subversive" under "subversion". It carries its own spelling, pronunciation,
+ * and part of speech, but no definition — MW leaves the meaning to the root.
+ */
+interface WireRunOn {
+  /** Run-on headword with syllable dots, e.g. `sub*ver*sive`. */
+  ure?: string
+  prs?: WirePronunciation[]
+  fl?: string
+  /** Usage text, which can hold example sentences as `["vis", […]]` runs. */
+  utxt?: WireDefiningText[]
+}
+
 interface WireDictionaryEntry {
   meta?: WireMeta
   hwi?: WireHeadword
@@ -95,6 +109,7 @@ interface WireDictionaryEntry {
   def?: WireDefSection[]
   /** Etymology, as token-bearing text runs. */
   et?: WireDefiningText[]
+  uros?: WireRunOn[]
 }
 
 /** A dictionary payload is either real entries or one of two miss shapes. */
@@ -181,7 +196,7 @@ export function parseMerriamDictionary(
   if (typeof payload[0] === 'string') return null
 
   const entries = (payload as WireDictionaryEntry[]).filter((entry) => matchesWord(entry, word))
-  if (entries.length === 0) return null
+  if (entries.length === 0) return parseRunOn(payload as WireDictionaryEntry[], word)
 
   const senses = collectSenses(entries)
   if (senses.length === 0) return null
@@ -224,6 +239,71 @@ function matchesWord(entry: WireDictionaryEntry, word: string): boolean {
   // `meta.id` carries a homograph suffix on repeats, e.g. `bank:1`.
   const id = entry.meta?.id?.split(':')[0]?.trim().toLowerCase()
   return id === word
+}
+
+/**
+ * The fallback for a word MW keeps only as a run-on.
+ *
+ * Some words have no entry of their own: "subversive" exists only as a run-on
+ * under "subversion", with a pronunciation and part of speech but no
+ * definition. Matching on headwords alone turned every such word into a "not
+ * found", even though MW plainly knows it.
+ *
+ * So when no headword matches, the root entry that lists the word as a run-on
+ * lends its definitions — labelled as the root's, never passed off as the
+ * word's own ("Related to subversion: the act of subverting…"). Pronunciation,
+ * audio, and part of speech come from the run-on itself, since those really
+ * are the word's. The root's examples are left out: they use the root word,
+ * not this one. Any example sentences on the run-on itself are kept.
+ */
+function parseRunOn(
+  entries: WireDictionaryEntry[],
+  word: string,
+): MerriamDictionaryResult | null {
+  for (const entry of entries) {
+    const runOn = entry.uros?.find((uro) => stripDots(uro.ure) === word)
+    if (!runOn) continue
+
+    const root = stripDots(entry.hwi?.hw) || entry.meta?.id?.split(':')[0]?.trim()
+    const definitions = (entry.shortdef ?? [])
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0)
+    if (!root || definitions.length === 0) continue
+
+    const partOfSpeech = runOn.fl?.trim() || 'other'
+    const examples = extractIllustrations(runOn.utxt).slice(0, MAX_EXAMPLES_PER_SENSE)
+    const senses: Sense[] = definitions
+      .slice(0, MAX_SENSES_PER_PART_OF_SPEECH)
+      .map((definition, index) => ({
+        partOfSpeech,
+        definition: `Related to ${root}: ${definition}`,
+        examples: index === 0 ? examples : [],
+      }))
+
+    let pronunciation: string | undefined
+    let audioUrl: string | undefined
+    for (const pron of runOn.prs ?? []) {
+      pronunciation ??= pron.mw?.trim() || undefined
+      const audio = pron.sound?.audio?.trim()
+      if (audio) audioUrl ??= buildAudioUrl(audio)
+    }
+
+    return {
+      word,
+      senses,
+      pronunciation,
+      audioUrl,
+      etymology: cleanTokens(firstText(entry.et)) || undefined,
+      raw: entries,
+    }
+  }
+
+  return null
+}
+
+/** A dotted MW headword (`sub*ver*sive`) as a plain lowercased word. */
+function stripDots(value: string | undefined): string {
+  return value?.replace(/\*/g, '').trim().toLowerCase() ?? ''
 }
 
 /**
