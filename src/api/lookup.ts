@@ -6,6 +6,7 @@ import {
   lookupMerriamThesaurus,
   parseMerriamDictionary,
   parseMerriamThesaurus,
+  type MerriamDictionaryResult,
   type MerriamThesaurusResult,
 } from './merriam'
 import { normaliseWord } from './http'
@@ -119,7 +120,7 @@ export async function lookupWord(rawWord: string): Promise<LookupResult> {
   return {
     id,
     word: dictionary.word,
-    senses: dictionary.senses,
+    senses: chooseSenses(dictionary, thesaurus),
     synonyms: mergeTerms(thesaurus?.synonyms ?? [], datamuse?.synonyms),
     antonyms: mergeTerms(thesaurus?.antonyms ?? [], datamuse?.antonyms),
     synonymsByPartOfSpeech: thesaurus?.byPartOfSpeech ?? [],
@@ -130,6 +131,24 @@ export async function lookupWord(rawWord: string): Promise<LookupResult> {
     rarity: datamuse?.rarity,
     cached: false,
   }
+}
+
+/**
+ * The definitions to show: the dictionary's, unless it only had a run-on.
+ *
+ * When the Collegiate lists a word only as a run-on ("subversive" under
+ * "subversion"), its senses are the root's, borrowed and labelled. The
+ * thesaurus sometimes has the word as a headword of its own, with a real
+ * definition per part of speech — "seeking to overthrow or undermine a
+ * governing power" — and that is the word's own meaning, so it wins. The
+ * dictionary still supplies pronunciation, audio, and etymology either way.
+ */
+function chooseSenses(
+  dictionary: MerriamDictionaryResult,
+  thesaurus: MerriamThesaurusResult | null,
+): Sense[] {
+  if (dictionary.runOnOf && thesaurus && thesaurus.senses.length > 0) return thesaurus.senses
+  return dictionary.senses
 }
 
 /* Cache -------------------------------------------------------------------- */
@@ -186,7 +205,7 @@ async function readFromCache(word: string): Promise<LookupResult | null> {
   return {
     id: word,
     word: dictionary.word,
-    senses: dictionary.senses,
+    senses: chooseSenses(dictionary, thesaurus),
     synonyms: mergeTerms(thesaurus?.synonyms ?? [], readCachedTerms(datamuse?.synonyms)),
     antonyms: mergeTerms(thesaurus?.antonyms ?? [], readCachedTerms(datamuse?.antonyms)),
     synonymsByPartOfSpeech: thesaurus?.byPartOfSpeech ?? [],

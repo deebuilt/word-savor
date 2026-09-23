@@ -13,8 +13,9 @@ import { fetchJson, normaliseWord, TIMEOUT } from './http'
  * - **Collegiate Dictionary** — definitions, part of speech, pronunciation,
  *   spoken audio, and etymology. This is the required source: no definition,
  *   no word.
- * - **Collegiate Thesaurus** — synonyms and antonyms. Optional; a word saves
- *   fine without it, just without MW's synonym lists.
+ * - **Collegiate Thesaurus** — synonyms and antonyms, plus the definitions for
+ *   a word the dictionary only lists as a run-on. Optional; a word saves fine
+ *   without it, just without MW's synonym lists.
  *
  * Both parsers are pure functions of the payload, split from the fetch on
  * purpose. Raw payloads are cached permanently, so a parser improvement later
@@ -121,6 +122,12 @@ export interface MerriamDictionaryResult {
   pronunciation?: string
   audioUrl?: string
   etymology?: string
+  /**
+   * Set when the word has no entry of its own and was found as a run-on under
+   * this root instead. The senses are then the root's, borrowed and labelled;
+   * `lookup.ts` prefers the thesaurus's own definitions when it has them.
+   */
+  runOnOf?: string
   /** The untouched response, for the cache. */
   raw: unknown
 }
@@ -137,6 +144,8 @@ interface WireThesaurusMeta {
 interface WireThesaurusEntry {
   meta?: WireThesaurusMeta
   fl?: string
+  shortdef?: string[]
+  def?: WireDefSection[]
 }
 
 type WireThesaurusResponse = WireThesaurusEntry[] | string[]
@@ -154,6 +163,15 @@ export interface MerriamThesaurusResult {
    * needs to know which sense a synonym belongs to.
    */
   byPartOfSpeech: PartOfSpeechTerms[]
+  /**
+   * The thesaurus's own short definitions, one per sense.
+   *
+   * Only used when the dictionary has no entry of its own for the word (see
+   * `runOnOf`). The thesaurus sometimes defines a word the Collegiate only
+   * lists as a run-on — "subversive" is one — and its wording is the word's
+   * own meaning rather than the root's.
+   */
+  senses: Sense[]
   raw: unknown
 }
 
@@ -294,6 +312,7 @@ function parseRunOn(
       pronunciation,
       audioUrl,
       etymology: cleanTokens(firstText(entry.et)) || undefined,
+      runOnOf: root,
       raw: entries,
     }
   }
@@ -325,7 +344,9 @@ function stripDots(value: string | undefined): string {
  * Capped per part of speech and overall, the same way the old parser was, so a
  * word with a deeply documented noun sense cannot crowd out its verb.
  */
-function collectSenses(entries: WireDictionaryEntry[]): Sense[] {
+function collectSenses(
+  entries: Pick<WireDictionaryEntry, 'fl' | 'shortdef' | 'def'>[],
+): Sense[] {
   const grouped = new Map<string, Sense[]>()
   const order: string[] = []
 
@@ -508,7 +529,9 @@ export function parseMerriamThesaurus(
       }
   }
 
-  if (synonyms.size === 0 && antonyms.size === 0) return null
+  const senses = collectSenses(entries)
+
+  if (synonyms.size === 0 && antonyms.size === 0 && senses.length === 0) return null
 
   const byPartOfSpeech: PartOfSpeechTerms[] = [...grouped.entries()]
     .map(([partOfSpeech, terms]) => ({
@@ -522,6 +545,7 @@ export function parseMerriamThesaurus(
     synonyms: [...synonyms].slice(0, MAX_SYN_ANT),
     antonyms: [...antonyms].slice(0, MAX_SYN_ANT),
     byPartOfSpeech,
+    senses,
     raw: payload,
   }
 }
